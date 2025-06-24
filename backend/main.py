@@ -52,7 +52,7 @@ def main():
     # Create model
     model = VisionTransformerEncoder(
         patch_dim=36,      # 6x6 = 36
-        embed_dim=32,      # Small embedding dimension
+        embed_dim=50,      # Small embedding dimension
         num_patches=100,   # 5x20grid of patches
         num_classes=10,    # MNIST digits 0-9
         num_heads=2,       # Multi-head attention

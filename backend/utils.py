@@ -1,7 +1,7 @@
 import torch
 
 
-def _build_sincos_pos_embed(self, num_patches, embed_dim):
+def _build_sincos_pos_embed(num_patches, embed_dim):
     """
     Build 1D sine-cosine positional encoding.
     Shape: [1, num_patches, embed_dim]
