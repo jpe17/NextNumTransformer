@@ -1,9 +1,9 @@
 Vision Transformer Model Metadata
 ===================================
-patch_dim: 49
-embed_dim: 32
-num_patches: 16
-num_classes: 10
+patch_dim: 36
+embed_dim: 16
+num_patches: 100
+num_classes: 13
 num_heads: 2
 num_layers: 2
-total_parameters: 19018
+total_parameters: 13565

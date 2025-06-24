@@ -31,6 +31,11 @@ DATA_SPLITS = {
 
 # --- Canvas and Sequence Generation ---
 
+# Define special tokens for the decoder
+SOS_TOKEN = 10  # Start of Sequence
+EOS_TOKEN = 11  # End of Sequence
+PAD_TOKEN = 12  # Padding token
+
 def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_digits=5):
     """
     Completely revamped logic for clean images:
@@ -41,10 +46,12 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
     4. Then, and only then, create patches.
     """
     all_canvas_patches = []
-    all_labels = []
+    all_decoder_inputs = []
+    all_target_outputs = []
     
     canvas_height, canvas_width = 30, 120
     patch_size = 6  # 30/6=5, 120/6=20 -> 5x20=100 patches
+    max_seq_len = max_digits + 1  # Sequence length is max digits + 1 for SOS/EOS token
 
     for _ in range(num_sequences):
         # 1. Pick 1-5 images
@@ -79,8 +86,8 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
             advance = random.randint(14, 22)  # Causes 6px to 14px of overlap
             current_x += advance
 
-        # Get labels sorted left-to-right
-        sorted_labels = [label for _, label in sorted(positions)]
+        # Get labels sorted left-to-right and truncate to max_digits
+        sorted_labels = [label for _, label in sorted(positions)][:max_digits]
         
         # 4. Invert canvas to get black digits on white background
         final_canvas = 1 - canvas
@@ -92,23 +99,43 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
         # patches shape: [100, 6, 6]
         patches = patches.unsqueeze(1) # Add channel dim: [100, 1, 6, 6]
 
-        # Pad labels
-        padded_labels = [-1] * max_digits
-        for i, label in enumerate(sorted_labels):
-            if i < max_digits:
-                padded_labels[i] = label
+        # 6. Create decoder input and target output sequences
+        
+        # Decoder Input: Starts with SOS, ends with PAD tokens
+        # Example: [10, 8, 3, 1, 12, 12] for max_digits=5
+        decoder_input = [SOS_TOKEN] + sorted_labels
+        decoder_input.extend([PAD_TOKEN] * (max_seq_len - len(decoder_input)))
+
+        # Target Output: Ends with EOS, ends with PAD tokens
+        # Example: [8, 3, 1, 11, 12, 12] for max_digits=5
+        target_output = sorted_labels + [EOS_TOKEN]
+        target_output.extend([PAD_TOKEN] * (max_seq_len - len(target_output)))
         
         all_canvas_patches.append(patches)
-        all_labels.append(padded_labels)
+        all_decoder_inputs.append(decoder_input)
+        all_target_outputs.append(target_output)
         
-    return torch.stack(all_canvas_patches), torch.tensor(all_labels)
+    # Return patches and a tuple containing the two label tensors
+    return (
+        torch.stack(all_canvas_patches), 
+        (torch.tensor(all_decoder_inputs, dtype=torch.long), torch.tensor(all_target_outputs, dtype=torch.long))
+    )
 
 
 def visualize_canvas_sequence(canvas_patches, canvas_labels, sequence_idx=0):
     """Reconstructs the canvas from patches and displays it."""
     patches = canvas_patches[sequence_idx]
-    labels = canvas_labels[sequence_idx]
     
+    # Check if labels are in the new tuple format (decoder_input, target_output)
+    # and use the target_output for visualization.
+    if isinstance(canvas_labels, tuple):
+        labels = canvas_labels[1][sequence_idx] # Use target_output for labels
+    else:
+        labels = canvas_labels[sequence_idx]
+
+    # Filter out special tokens (SOS, EOS, PAD) to get the true digit labels
+    valid_labels = [label for label in labels.tolist() if label < 10]
+
     # Reconstruct the 30x120 canvas from 100 patches of 6x6
     canvas_height, canvas_width = 30, 120
     patch_size = 6
@@ -118,11 +145,8 @@ def visualize_canvas_sequence(canvas_patches, canvas_labels, sequence_idx=0):
     for i, patch in enumerate(patches):
         row = i // patches_per_row
         col = i % patches_per_row
-        full_canvas[row*patch_size:(row+1)*patch_size, col*patch_size:(col+1)*patch_size] = patch[0]
+        full_canvas[row*patch_size:(row+1)*patch_size, col*patch_size:(col+1)*patch_size] = patch.squeeze()
 
-    # Filter out padding (-1) from labels
-    valid_labels = [label for label in labels.tolist() if label != -1]
-    
     # Show the canvas with a smoother interpolation
     plt.figure(figsize=(15, 3))
     plt.imshow(full_canvas.numpy(), cmap='gray', interpolation='bilinear')
@@ -158,3 +182,14 @@ def get_data(split='train', num_sequences=1000, max_digits=5, num_source_images=
         img_labels = img_labels[:num_source_images]
         
     return create_canvas_sequences(images, img_labels, num_sequences, max_digits)
+
+
+if __name__ == "__main__":
+    train_canvas_patches, train_canvas_labels = get_data(
+        'train', 
+        num_sequences=5000, 
+        max_digits=5,
+        num_source_images=42000
+    )
+
+    visualize_canvas_sequence(train_canvas_patches, train_canvas_labels, sequence_idx=0)

@@ -6,9 +6,16 @@ Simple Vision Transformer Demo
 import torch
 import os
 from data_processing import get_data
-from transformer_architecture import VisionTransformerEncoder
+from transformer_architecture import VisionTransformer
 from training_engine import train_model
 from torch.utils.data import TensorDataset, DataLoader
+from analysis_tools import (
+    analyze_training_history,
+    show_learning_insights,
+    analyze_sequence_predictions,
+    show_prediction_mistakes,
+    show_prediction_example
+)
 
 
 
@@ -24,56 +31,57 @@ def main():
     
     # Load data
     print("Loading and processing data...")
-    train_canvas_patches, train_canvas_labels = get_data(
+    train_canvas_patches, (train_decoder_inputs, train_target_outputs) = get_data(
         'train', 
         num_sequences=5000, 
         max_digits=5,
         num_source_images=42000
     )
-    val_canvas_patches, val_canvas_labels = get_data(
+    val_canvas_patches, (val_decoder_inputs, val_target_outputs) = get_data(
         'val',
         num_sequences=1000,
         max_digits=5,
-        num_source_images=None # Use all val images
+        num_source_images=10000 # Use all val images
     )
-
-    print(f"Train canvas patches shape: {train_canvas_patches.shape}")
-    print(f"Train canvas labels shape: {train_canvas_labels.shape}")
-    print(f"Validation canvas patches shape: {val_canvas_patches.shape}")
-    print(f"Validation canvas labels shape: {val_canvas_labels.shape}")
     
     # Create datasets and dataloaders
-    train_dataset = TensorDataset(train_canvas_patches, train_canvas_labels)
-    val_dataset = TensorDataset(val_canvas_patches, val_canvas_labels)
+    train_dataset = TensorDataset(train_canvas_patches, train_decoder_inputs, train_target_outputs)
+    val_dataset = TensorDataset(val_canvas_patches, val_decoder_inputs, val_target_outputs)
     
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
         
     # Create model
-    model = VisionTransformerEncoder(
-        patch_dim=36,      # 6x6 = 36
-        embed_dim=50,      # Small embedding dimension
-        num_patches=100,   # 5x20grid of patches
-        num_classes=10,    # MNIST digits 0-9
-        num_heads=2,       # Multi-head attention
-        num_layers=2       # Just 2 transformer layers
-    )
+    model_config = {
+        'patch_dim': 36,
+        'embed_dim': 16,
+        'num_patches': 100,
+        'num_heads': 2,
+        'num_layers': 2,
+        'ffn_ratio': 2,
+        'vocab_size': 13,
+        'max_seq_len': 6  # max_digits + 1 for SOS
+    }
+    model = VisionTransformer(**model_config)
     
     print(f"Model created with {sum(p.numel() for p in model.parameters()):,} parameters\n")
     
     # Show tensor flow on first batch
     print("=== Tensor Flow Demo ===")
-    sample_patches, sample_labels = next(iter(train_loader))
-    print(f"Processing batch with {len(sample_labels)} images")
+    sample_patches, sample_decoder_inputs, sample_target_outputs = next(iter(train_loader))
+    print(f"Processing batch with {len(sample_patches)} images")
     
     with torch.no_grad():
-        x = model(sample_patches)
-        print(x.shape)
-        print(x)
+        logits = model(sample_patches, sample_decoder_inputs)
+    
+    print("#"*50)
+    print("Logits shape:", logits.shape) # Expected: [batch_size, seq_len, vocab_size]
+    print("Target shape:", sample_target_outputs.shape) # Expected: [batch_size, seq_len]
+    print("#"*50)
     
     # Train the model
     print("=== Training ===")
-    train_model(model, train_loader, val_loader, epochs=5, lr=0.001)
+    history = train_model(model, train_loader, val_loader, epochs=100, lr=0.001)
     
     # Save the trained model
     model_path = os.path.join(artifacts_dir, "trained_model.pth")
@@ -82,12 +90,12 @@ def main():
     
     # Save model metadata
     metadata = {
-        'patch_dim': 36,
-        'embed_dim': 32,
-        'num_patches': 100,
-        'num_classes': 10,
-        'num_heads': 2,
-        'num_layers': 2,
+        'patch_dim': model_config['patch_dim'],
+        'embed_dim': model_config['embed_dim'],
+        'num_patches': model_config['num_patches'],
+        'num_classes': model_config['vocab_size'],
+        'num_heads': model_config['num_heads'],
+        'num_layers': model_config['num_layers'],
         'total_parameters': sum(p.numel() for p in model.parameters())
     }
     
@@ -100,6 +108,14 @@ def main():
     
     print(f"📋 Model metadata saved to: {metadata_path}")
     print("\n✅ Training complete! Model artifacts saved.")
+
+    # --- Analysis ---
+    print("\n\n=== Post-Training Analysis ===")
+    analyze_training_history(history)
+    show_learning_insights(history)
+    analyze_sequence_predictions(model, val_loader, num_batches=5)
+    show_prediction_mistakes(model, val_loader, num_mistakes=3)
+    show_prediction_example(model, val_loader)
 
 
 if __name__ == "__main__":
