@@ -5,6 +5,7 @@ Simple Vision Transformer Demo
 
 import torch
 import os
+from datetime import datetime
 from data_processing import get_data
 from transformer_architecture import VisionTransformer
 from training_engine import train_model
@@ -54,10 +55,10 @@ def main():
     # Create model
     model_config = {
         'patch_dim': 36,
-        'embed_dim': 128,
+        'embed_dim': 256,
         'num_patches': 100,
         'num_heads': 2,
-        'num_layers': 5,
+        'num_layers': 6,
         'ffn_ratio': 2,
         'vocab_size': 13,
         'max_seq_len': 6  # max_digits + 1 for SOS
@@ -81,33 +82,54 @@ def main():
     
     # Train the model
     print("=== Training ===")
-    history = train_model(model, train_loader, val_loader, epochs=100, lr=0.001)
+    history = train_model(model, train_loader, val_loader, epochs=100, lr=0.001, artifacts_dir=artifacts_dir)
     
-    # Save the trained model
-    model_path = os.path.join(artifacts_dir, "trained_model.pth")
+    # Get timestamp from training history for consistent naming
+    timestamp = history['timestamp']
+    run_name = history['run_name']
+    
+    # Save the trained model locally with timestamp
+    model_path = os.path.join(artifacts_dir, f"trained_model_{timestamp}.pth")
     torch.save(model.state_dict(), model_path)
-    print(f"\n💾 Model saved to: {model_path}")
+    print(f"\n💾 Model saved locally to: {model_path}")
     
-    # Save model metadata
+    # Save model metadata with timestamp and training info
     metadata = {
+        'timestamp': timestamp,
+        'run_name': run_name,
+        'training_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'patch_dim': model_config['patch_dim'],
         'embed_dim': model_config['embed_dim'],
         'num_patches': model_config['num_patches'],
         'num_classes': model_config['vocab_size'],
         'num_heads': model_config['num_heads'],
         'num_layers': model_config['num_layers'],
-        'total_parameters': sum(p.numel() for p in model.parameters())
+        'total_parameters': sum(p.numel() for p in model.parameters()),
+        'final_train_loss': history['train_losses'][-1] if history['train_losses'] else 'N/A',
+        'final_val_loss': history['val_losses'][-1] if history['val_losses'] else 'N/A',
+        'final_train_accuracy': history['train_accuracies'][-1] if history['train_accuracies'] else 'N/A',
+        'final_val_accuracy': history['val_accuracies'][-1] if history['val_accuracies'] else 'N/A',
+        'wandb_artifact_name': f"vision_transformer_model_{timestamp}"
     }
     
-    metadata_path = os.path.join(artifacts_dir, "model_metadata.txt")
+    metadata_path = os.path.join(artifacts_dir, f"model_metadata_{timestamp}.txt")
     with open(metadata_path, 'w') as f:
         f.write("Vision Transformer Model Metadata\n")
         f.write("=" * 35 + "\n")
+        f.write(f"Training Run: {run_name}\n")
+        f.write(f"Timestamp: {timestamp}\n")
+        f.write(f"Training Date: {metadata['training_date']}\n")
+        f.write("-" * 35 + "\n")
         for key, value in metadata.items():
-            f.write(f"{key}: {value}\n")
+            if key not in ['timestamp', 'run_name', 'training_date']:  # Already printed above
+                f.write(f"{key}: {value}\n")
+        f.write("-" * 35 + "\n")
+        f.write(f"Wandb Artifact: {metadata['wandb_artifact_name']}\n")
+        f.write("Note: Model is also saved as wandb artifact for remote access\n")
     
     print(f"📋 Model metadata saved to: {metadata_path}")
-    print("\n✅ Training complete! Model artifacts saved.")
+    print(f"🏷️  Wandb artifact name: {metadata['wandb_artifact_name']}")
+    print("\n✅ Training complete! Model artifacts saved locally and to wandb.")
 
     # --- Analysis ---
     print("\n\n=== Post-Training Analysis ===")
