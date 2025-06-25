@@ -7,59 +7,7 @@ Real-time digit recognition - just hold up your numbers!
 import torch
 import cv2
 import numpy as np
-import os
-import glob
-import json
-from model import VisionTransformer
-from data_processing import SOS_TOKEN, EOS_TOKEN, PAD_TOKEN
-
-def load_latest_model():
-    """Auto-load the most recent trained model."""
-    # Get project paths
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(current_dir)
-    artifacts_dir = os.path.join(project_root, "artifacts")
-    
-    # Find all run directories
-    run_dirs = glob.glob(os.path.join(artifacts_dir, "run_*"))
-    if not run_dirs:
-        raise FileNotFoundError("No trained models found! Train a model first.")
-    
-    # Use the most recent one
-    latest_run = sorted(run_dirs)[-1]
-    run_name = os.path.basename(latest_run)
-    
-    print(f"🤖 Loading model from: {run_name}")
-    
-    # Load saved config
-    config_file = os.path.join(latest_run, "model_config.json")
-    
-    if not os.path.exists(config_file):
-        raise FileNotFoundError(f"Config file not found at {config_file}")
-    
-    with open(config_file, 'r') as f:
-        saved_config = json.load(f)
-    
-    # Model config from saved config
-    model_config = {
-        'patch_dim': saved_config['patch_dim'],
-        'embed_dim': saved_config['embed_dim'],
-        'num_patches': saved_config['num_patches'],
-        'num_heads': saved_config['num_heads'],
-        'num_layers': saved_config['num_layers'],
-        'ffn_ratio': saved_config['ffn_ratio'],
-        'vocab_size': saved_config['vocab_size'],
-        'max_seq_len': saved_config['max_seq_len']
-    }
-    
-    # Load model
-    model = VisionTransformer(**model_config)
-    model_path = os.path.join(latest_run, "model.pth")
-    model.load_state_dict(torch.load(model_path, map_location='cpu'))
-    model.eval()
-    
-    print(f"✅ Model loaded: {sum(p.numel() for p in model.parameters()):,} parameters")
-    return model, model_config
+from utils import load_trained_model, predict_sequence
 
 def process_region(region):
     """Convert camera region to model input - white bg + black digits."""
@@ -84,26 +32,6 @@ def process_region(region):
     
     return patches
 
-def predict_live(model, patches, max_seq_len=6):
-    """Fast prediction for live inference."""
-    patches = patches.unsqueeze(0)  # Add batch dim
-    generated = [SOS_TOKEN]
-    
-    with torch.no_grad():
-        for _ in range(max_seq_len - 1):
-            decoder_input = generated + [PAD_TOKEN] * (max_seq_len - len(generated))
-            decoder_input = torch.tensor([decoder_input], dtype=torch.long)
-            
-            logits = model(patches, decoder_input)
-            next_token = torch.argmax(logits[0, len(generated)-1]).item()
-            
-            generated.append(next_token)
-            if next_token == EOS_TOKEN:
-                break
-    
-    # Return only digits (0-9)
-    return [token for token in generated[1:] if token < 10]
-
 def main():
     """Real-time inference with live camera."""
     print("🚀 Starting Live Digit Recognition!")
@@ -112,9 +40,9 @@ def main():
     print("⚡ Predictions update in real-time!")
     print("🚪 Press 'q' to quit\n")
     
-    # Load model
+    # Load model using modular function
     try:
-        model, config = load_latest_model()
+        model, config = load_trained_model(run_folder='run_25_06_25__1_54_21')  # Use latest model
     except Exception as e:
         print(f"❌ Error loading model: {e}")
         return
@@ -154,7 +82,8 @@ def main():
         if frame_count % 3 == 0:  # Every 3rd frame
             try:
                 patches = process_region(region)
-                prediction = predict_live(model, patches, config.get('max_seq_len'))
+                # Use modular prediction function
+                prediction = predict_sequence(model, patches, config.get('max_seq_len', 6))
                 if prediction:  # Only update if we got a prediction
                     last_prediction = prediction
             except:
