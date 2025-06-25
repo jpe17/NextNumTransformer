@@ -5,11 +5,17 @@ Simple Sequential Data Processing
 
 import torch
 import random
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
+from utils import load_config
+
+# Example usage:
+
+config = load_config('backend/config.json')
 
 # --- Data Loading and Splitting (run once) ---
 
@@ -20,8 +26,8 @@ ALL_IMAGES, ALL_LABELS = next(iter(loader))
 
 # Define train/val/test splits on the original digit images
 n_total = len(ALL_IMAGES)
-train_end = int(n_total * 0.7)
-val_end = int(n_total * 0.85)
+train_end = int(n_total * config.get('train_split'))
+val_end = int(n_total * config.get('val_split'))
 
 DATA_SPLITS = {
     'train': (ALL_IMAGES[:train_end], ALL_LABELS[:train_end]),
@@ -32,9 +38,9 @@ DATA_SPLITS = {
 # --- Canvas and Sequence Generation ---
 
 # Define special tokens for the decoder
-SOS_TOKEN = 10  # Start of Sequence
-EOS_TOKEN = 11  # End of Sequence
-PAD_TOKEN = 12  # Padding token
+SOS_TOKEN = config.get('SOS_TOKEN')  # Start of Sequence
+EOS_TOKEN = config.get('EOS_TOKEN')  # End of Sequence
+PAD_TOKEN = config.get('PAD_TOKEN')  # Padding token
 
 def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_digits=5):
     """
@@ -182,14 +188,3 @@ def get_data(split='train', num_sequences=1000, max_digits=5, num_source_images=
         img_labels = img_labels[:num_source_images]
         
     return create_canvas_sequences(images, img_labels, num_sequences, max_digits)
-
-
-if __name__ == "__main__":
-    train_canvas_patches, train_canvas_labels = get_data(
-        'train', 
-        num_sequences=5000, 
-        max_digits=5,
-        num_source_images=42000
-    )
-
-    visualize_canvas_sequence(train_canvas_patches, train_canvas_labels, sequence_idx=0)

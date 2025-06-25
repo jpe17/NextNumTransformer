@@ -4,5 +4,5 @@ tqdm
 opencv-python
 numpy
 pillow
-cv2
+matplotlib
 wandb

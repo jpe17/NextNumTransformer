@@ -6,30 +6,63 @@ Simple inference script that reuses existing code.
 
 import torch
 import os
-from transformer_architecture import VisionTransformer
+import json
+from model import VisionTransformer
 from data_processing import get_data, visualize_canvas_sequence
+from utils import load_config
+
+config = load_config('backend/config.json')
+
 
 # Special tokens
 SOS_TOKEN = 10
 EOS_TOKEN = 11
 PAD_TOKEN = 12
 
-def load_trained_model():
+def find_latest_run(artifacts_dir):
+    """Find the latest run directory in artifacts."""
+    run_dirs = [d for d in os.listdir(artifacts_dir) if d.startswith('run_') and os.path.isdir(os.path.join(artifacts_dir, d))]
+    if not run_dirs:
+        raise FileNotFoundError("No run directories found in artifacts")
+    return max(run_dirs)  # Sort alphabetically will give latest due to timestamp format
+
+def load_trained_model(run_folder='run_25_06_25__1_54_21'):
     """Load the trained model from artifacts."""
-    # Model config (should match training)
-    model_config = {
-        'patch_dim': 36, 'embed_dim': 128, 'num_patches': 100,
-        'num_heads': 2, 'num_layers': 5, 'ffn_ratio': 2,
-        'vocab_size': 13, 'max_seq_len': 6
-    }
-    
-    # Load model
+    # Load model configuration from metadata file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
-    model_path = os.path.join(project_root, "artifacts", "trained_model.pth")
+    artifacts_dir = os.path.join(project_root, "artifacts")
     
+    # Use specified run folder or find latest
+    if run_folder is None:
+        run_folder = find_latest_run(artifacts_dir)
+        print(f"Using latest run: {run_folder}")
+    
+    config_path = os.path.join(artifacts_dir, run_folder, "model_config.json")
+    model_path = os.path.join(artifacts_dir, run_folder, "model.pth")
+    
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Config file not found at {config_path}")
     if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model not found at {model_path}. Train the model first!")
+        raise FileNotFoundError(f"Model not found at {model_path}")
+    
+    # Load the saved config directly
+    with open(config_path, 'r') as f:
+        saved_config = json.load(f)
+    
+    # Extract model config from saved config
+    model_config = {
+        'patch_dim': saved_config['patch_dim'],
+        'embed_dim': saved_config['embed_dim'],
+        'num_patches': saved_config['num_patches'],
+        'num_heads': saved_config['num_heads'],
+        'num_layers': saved_config['num_layers'],
+        'ffn_ratio': saved_config['ffn_ratio'],
+        'vocab_size': saved_config['vocab_size'],
+        'max_seq_len': saved_config['max_seq_len']
+    }
+    
+    print(f"Loaded model configuration from {run_folder}: {model_config}")
     
     model = VisionTransformer(**model_config)
     model.load_state_dict(torch.load(model_path, map_location='cpu'))
@@ -65,7 +98,7 @@ def infer_single_image(image_index=0):
     print(f"=== Inference on Test Image {image_index} ===")
     
     # Load model and test data
-    model, config = load_trained_model()
+    model, config = load_trained_model(run_folder="run_25_06_25__1_54_21")
     test_patches, test_labels = get_data('test', num_sequences=50, max_digits=5)
     
     if image_index >= len(test_patches):
@@ -92,7 +125,7 @@ def run_inference_demo():
     """Demo inference on multiple test images."""
     print("=== Vision Transformer Inference Demo ===\n")
     
-    model, config = load_trained_model()
+    model, config = load_trained_model(run_folder="run_25_06_25__1_54_21")
     test_patches, test_labels = get_data('test', num_sequences=100, max_digits=5)
     
     correct = 0
