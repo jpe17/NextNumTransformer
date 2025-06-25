@@ -185,6 +185,7 @@ def get_data(split='train', num_sequences=1000, max_digits=5, num_source_images=
     # Optionally, use a subset of the source images
     if num_source_images is not None:
         images = images[:num_source_images]
-        img_labels = img_labels[:num_source_images]
+        img_labels = img_labels[
+            :num_source_images]
         
     return create_canvas_sequences(images, img_labels, num_sequences, max_digits)

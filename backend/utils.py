@@ -3,6 +3,11 @@ import torch
 import os
 import glob
 
+# Token definitions for sequence generation
+SOS_TOKEN = 10  # Start of Sequence
+EOS_TOKEN = 11  # End of Sequence  
+PAD_TOKEN = 12  # Padding token
+
 def load_config(filepath):
   """Loads a JSON configuration file and returns it as a dictionary."""
   try:
@@ -16,7 +21,7 @@ def load_config(filepath):
     print(f"Error: Invalid JSON format in {filepath}")
     return None
 
-def find_latest_run_dir(artifacts_dir=None):
+def find_latest_run_dir(artifacts_dir='None'):
     """Find the latest run directory in artifacts."""
     if artifacts_dir is None:
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -97,13 +102,13 @@ def load_trained_model(run_folder=None, artifacts_dir=None, verbose=True):
     
     return model, model_config
 
-def predict_sequence(model, patches, max_seq_len=6):
+def predict_sequence(model, patches, model_config):
     """Autoregressive prediction for digit sequences.
     
     Args:
         model: Trained VisionTransformer model
         patches: Input patches tensor [num_patches, channels, height, width]
-        max_seq_len: Maximum sequence length for prediction
+        model_config: The configuration dictionary for the loaded model.
     
     Returns:
         list: Predicted digit sequence (only digits 0-9)
@@ -113,6 +118,7 @@ def predict_sequence(model, patches, max_seq_len=6):
         patches = patches.unsqueeze(0)
     
     generated = [SOS_TOKEN]
+    max_seq_len = model_config['max_seq_len']
     
     with torch.no_grad():
         for _ in range(max_seq_len - 1):

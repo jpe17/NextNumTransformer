@@ -31,16 +31,18 @@ class VisionTransformer(nn.Module):
         self.num_heads = num_heads
         self.num_layers = num_layers
         self.patch_dim = patch_dim
+        self.max_seq_len = max_seq_len
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
         
         # --- Encoder Components ---
         self.patch_embedding = nn.Linear(patch_dim, embed_dim)
+        self.encoder_pos_embedding = nn.Parameter(torch.randn(1 , num_patches, embed_dim), requires_grad=True) 
         self.encoder_attention_layers = nn.ModuleList()
         self.encoder_ffn_layers = nn.ModuleList()
         self.encoder_norm1_layers = nn.ModuleList()
         self.encoder_norm2_layers = nn.ModuleList()
-        self.encoder_pos_embedding = nn.Embedding(num_patches, embed_dim)
+
 
         for _ in range(num_layers):
             self.encoder_attention_layers.append(nn.ModuleDict({
@@ -56,8 +58,7 @@ class VisionTransformer(nn.Module):
 
         # --- Decoder Components ---
         self.token_embedding = nn.Embedding(vocab_size, embed_dim)
-        self.decoder_pos_embedding = nn.Embedding(max_seq_len, embed_dim)
-        
+        self.decoder_pos_embedding = nn.Parameter(torch.randn(1 , max_seq_len, embed_dim), requires_grad=True) 
         self.decoder_masked_attention_layers = nn.ModuleList()
         self.decoder_cross_attention_layers = nn.ModuleList()
         self.decoder_ffn_layers = nn.ModuleList()
@@ -88,12 +89,11 @@ class VisionTransformer(nn.Module):
         batch_size = src_patches.size(0)
 
         # --- Encoder Path ---
+
         x = src_patches.flatten(start_dim=2)
         x = self.patch_embedding(x)
-        num_patches = x.size(1)
-        patch_positions = torch.arange(num_patches, device=x.device).unsqueeze(0)
-        pos_emb = self.encoder_pos_embedding(patch_positions)
-        x = x + pos_emb
+        x = x + self.encoder_pos_embedding
+
         
         for i in range(self.num_layers):
             # Pre-Norm & Attention
@@ -121,9 +121,7 @@ class VisionTransformer(nn.Module):
         # --- Decoder Path ---
         seq_len = tgt_tokens.size(1)
         y = self.token_embedding(tgt_tokens)
-        positions = torch.arange(seq_len, device=tgt_tokens.device).unsqueeze(0)
-        pos_emb = self.decoder_pos_embedding(positions)
-        y = y + pos_emb
+        y = y + self.decoder_pos_embedding
         
         # Causal Mask
         causal_mask = ~torch.triu(torch.ones(seq_len, seq_len, device=tgt_tokens.device), diagonal=1).bool()
