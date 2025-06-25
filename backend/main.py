@@ -48,16 +48,16 @@ def main():
     train_dataset = TensorDataset(train_canvas_patches, train_decoder_inputs, train_target_outputs)
     val_dataset = TensorDataset(val_canvas_patches, val_decoder_inputs, val_target_outputs)
     
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=2048, shuffle=False)
         
     # Create model
     model_config = {
         'patch_dim': 36,
-        'embed_dim': 16,
+        'embed_dim': 128,
         'num_patches': 100,
         'num_heads': 2,
-        'num_layers': 2,
+        'num_layers': 5,
         'ffn_ratio': 2,
         'vocab_size': 13,
         'max_seq_len': 6  # max_digits + 1 for SOS
@@ -67,7 +67,7 @@ def main():
     print(f"Model created with {sum(p.numel() for p in model.parameters()):,} parameters\n")
     
     # Show tensor flow on first batch
-    print("=== Tensor Flow Demo ===")
+    print("=== Tensor Demo ===")
     sample_patches, sample_decoder_inputs, sample_target_outputs = next(iter(train_loader))
     print(f"Processing batch with {len(sample_patches)} images")
     

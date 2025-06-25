@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+import wandb
 
 
 def train_model(model, train_loader, val_loader, epochs=10, lr=0.001, pad_token_id=12):
@@ -20,7 +21,9 @@ def train_model(model, train_loader, val_loader, epochs=10, lr=0.001, pad_token_
         'train_losses': [], 'val_losses': [],
         'train_accuracies': [], 'val_accuracies': []
     }
-    
+
+    wandb.init(project="vision-transformer", name="training")
+
     for epoch in range(epochs):
         # Training
         model.train()
@@ -33,7 +36,7 @@ def train_model(model, train_loader, val_loader, epochs=10, lr=0.001, pad_token_
         for batch_idx, (patches, decoder_inputs, target_outputs) in enumerate(pbar):
             optimizer.zero_grad()
             logits = model(patches, decoder_inputs)
-            
+
             loss = criterion(logits.view(-1, logits.size(-1)), target_outputs.view(-1))
             loss.backward()
             optimizer.step()
