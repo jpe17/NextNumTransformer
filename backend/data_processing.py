@@ -155,7 +155,7 @@ def visualize_canvas_sequence(canvas_patches, canvas_labels, sequence_idx=0):
 
     # Show the canvas with a smoother interpolation
     plt.figure(figsize=(15, 3))
-    plt.imshow(full_canvas.numpy(), cmap='gray', interpolation='bilinear')
+    plt.imshow(full_canvas.numpy(), cmap='gray', interpolation='lanczos')
     plt.title(f'Canvas Sequence {sequence_idx}: Labels = {valid_labels}')
     plt.axis('off')
     plt.tight_layout()
