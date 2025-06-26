@@ -3,7 +3,13 @@ torchvision
 tqdm
 opencv-python
 numpy
-pillow
 matplotlib
 wandb
-Pillow
+dash
+dash-bootstrap-components
+python-multipart
+pillow
+aiofiles
+streamlit
+streamlit-webrtc
+av
