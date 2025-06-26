@@ -2,3 +2,4 @@
 venv/
 wandb/
 backend/__pycache__/
+canvas/

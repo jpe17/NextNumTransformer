@@ -3,7 +3,7 @@ import base64
 import io
 import sys
 import os
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, request, send_from_directory
 from PIL import Image
 import numpy as np
 import matplotlib
@@ -117,10 +117,10 @@ def gen_frames():
             if last_prediction:
                 prediction_str = ''.join(map(str, last_prediction))
                 cv2.putText(display_frame, f'Live: {prediction_str}', (x1, y1-10), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (22, 115, 249), 2)
         
         # --- Overlays ---
-        cv2.rectangle(display_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.rectangle(display_frame, (x1, y1), (x2, y2), (22, 115, 249), 2)
 
         ret, buffer = cv2.imencode('.jpg', display_frame)
         frame_bytes = buffer.tobytes()
@@ -160,6 +160,45 @@ def capture():
         "prediction": prediction_str,
         "stepsImage": steps_img_b64
     }
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    """Handle image uploads, run inference, and return results."""
+    if 'file' not in request.files:
+        return {"error": "No file part in the request"}, 400
+    file = request.files['file']
+    if file.filename == '':
+        return {"error": "No file selected for uploading"}, 400
+
+    if file:
+        try:
+            pil_image = Image.open(file.stream)
+            
+            patches, steps = _preprocess_image(pil_image, model_config, kernel_size=(2, 2))
+            predicted_digits = predict_sequence(model, patches, model_config) if patches is not None else []
+            prediction_str = ''.join(map(str, predicted_digits)) if predicted_digits else "N/A"
+            
+            steps_img_b64 = plot_steps_to_base64(steps, prediction_str)
+            
+            return {
+                "prediction": prediction_str,
+                "stepsImage": steps_img_b64
+            }
+        except Exception as e:
+            print(f"Error processing uploaded file: {e}")
+            return {"error": "Failed to process the uploaded image."}, 500
+            
+    return {"error": "File upload failed for an unknown reason."}, 400
+
+@app.route('/MLI.png')
+def serve_logo():
+    """Serves the MLI.png logo file from the root directory."""
+    return send_from_directory(app.root_path, 'MLI.png')
+
+@app.route('/logo.png')
+def serve_header_logo():
+    """Serves the logo.png file from the root directory."""
+    return send_from_directory(app.root_path, 'logo.png')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

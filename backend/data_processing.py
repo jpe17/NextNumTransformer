@@ -55,7 +55,8 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
        Overlaps are handled by taking the brightest pixel.
     3. Invert the final canvas to get black-on-white.
     4. Add Gaussian noise if specified (training only).
-    5. Then, and only then, create patches.
+    5. Apply inference-style preprocessing (contrast, erosion) to simulate real-world images.
+    6. Then, and only then, create patches.
     """
     all_canvas_patches = []
     all_decoder_inputs = []
@@ -143,8 +144,22 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
             noise = torch.randn_like(final_canvas) * 0.1  # Small noise std
             final_canvas = torch.clamp(final_canvas + noise, 0, 1)
 
+        # Apply the same preprocessing as inference to bridge the domain gap
+        # between synthetic training data and real-world images.
+        canvas_np = final_canvas.numpy()
+        
+        # High-contrast normalization (mimics inference preprocessing)
+        processed_canvas = np.clip(((canvas_np - 0.45) * 8) + 0.45, 0, 1)
+
+        # Erosion to thicken digits (mimics inference preprocessing)
+        kernel = np.ones((2, 2), np.uint8)
+        eroded_canvas = cv2.erode(processed_canvas, kernel)
+        
+        # Convert back to tensor for patchifying
+        processed_tensor = torch.from_numpy(eroded_canvas.astype(np.float32))
+
         # 6. Patch the final canvas
-        patches = final_canvas.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
+        patches = processed_tensor.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
         patches = patches.contiguous().view(-1, patch_size, patch_size)
         patches = patches.unsqueeze(1) # Add channel dim: [100, 1, 6, 6]
 

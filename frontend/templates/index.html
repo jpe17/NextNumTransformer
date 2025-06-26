@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision Spotlight | AI that shows its work</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Audiowide&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background: #000000;
+            --surface: rgba(22, 27, 34, 0.6);
+            --primary: #F97316; /* Orange 500 */
+            --primary-hover: #FB923C; /* Orange 400 */
+            --success: #F97316; /* Orange 500 */
+            --text-primary: #F0F2F6;
+            --text-secondary: #8B949E;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 10% 20%, #8257E530, transparent 30%),
+                        radial-gradient(circle at 90% 80%, #33D69F30, transparent 30%),
+                        radial-gradient(circle at 50% 50%, #58A6FF30, transparent 40%);
+            animation: aurora 20s infinite linear;
+            z-index: -1;
+        }
+
+        @keyframes aurora {
+            0% { transform: rotate(0deg) scale(1.5); }
+            50% { transform: rotate(180deg) scale(2); }
+            100% { transform: rotate(360deg) scale(1.5); }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header .title-group {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .header .title-group img {
+            height: 60px; /* Adjust size as needed */
+        }
+
+        .header h1 {
+            font-family: 'Audiowide', sans-serif;
+            font-size: 3.8rem;
+            font-weight: 400;
+            color: var(--text-primary);
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+        }
+
+        .header h1 .title-logo {
+            height: 80px;
+            margin-right: -0.2em; /* Visually tuck the 'ision' into the logo */
+            margin-bottom: 0.1em; /* Align baseline */
+        }
+
+        .header h1 .highlight {
+            color: var(--primary);
+            margin-left: 0.25em; /* Add a bit of space */
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            max-width: 1400px;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .top-panel {
+            display: flex;
+            gap: 2rem;
+            align-items: stretch; /* Makes columns equal height */
+        }
+
+        #right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            justify-content: space-between;
+        }
+
+        .card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        #video-container {
+            flex: 2;
+            min-width: 640px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h2 {
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+            margin-top: 0;
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        img#video-feed {
+            width: 100%;
+            border-radius: 8px;
+            background-color: #000;
+            border: 1px solid var(--border);
+            flex-grow: 1;
+            min-height: 0;
+        }
+
+        button#capture-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            width: 100%;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            background-image: linear-gradient(to right, var(--primary) 0%, #a283e9 51%, var(--primary) 100%);
+            background-size: 200% auto;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        button#capture-btn:hover:not(:disabled) {
+            background-position: right center;
+            transform: translateY(-2px);
+        }
+
+        button#capture-btn:disabled {
+            background-image: none;
+            background-color: #30363D;
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            transform: translateY(0);
+        }
+        
+        #prediction-display {
+            text-align: center;
+            font-size: 7rem;
+            line-height: 1;
+            font-weight: 900;
+            color: var(--success);
+            padding: 1.5rem 0;
+        }
+
+        #steps-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #steps-container img {
+            max-width: 100%;
+            border-radius: 6px;
+            margin-top: 1rem;
+        }
+        
+        .placeholder {
+            color: var(--text-secondary);
+            text-align: center;
+            font-size: 1rem;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            flex-direction: column;
+        }
+        
+        .loader {
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        .footer {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            width: 100%;
+            max-width: 1400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .footer img {
+            height: 32px;
+            opacity: 0.8;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #upload-card {
+            flex-grow: 1; /* Make this card take available space */
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center content vertically */
+            gap: 1rem;
+        }
+        .upload-area {
+            display: flex;
+            flex-direction: column; /* Stack items vertically */
+            align-items: center;
+            gap: 1rem;
+        }
+        .upload-label {
+            display: flex;
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background-color: #30363D;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-weight: 500;
+        }
+        .upload-label:hover {
+            background-color: #444c56;
+        }
+        #file-name-display {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        #analyze-file-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            background-image: linear-gradient(to right, var(--success) 0%, #3ce8a8 51%, var(--success) 100%);
+            background-size: 200% auto;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        #analyze-file-btn:hover:not(:disabled) {
+            background-position: right center;
+            transform: translateY(-2px);
+        }
+        #analyze-file-btn:disabled {
+            background-image: none;
+            background-color: #30363D;
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>
+            <img src="/logo.png" alt="Logo" class="title-logo">ision <span class="highlight">Spotlight</span>
+        </h1>
+        <p>See what the AI sees. Real-time attention on demand.</p>
+    </header>
+
+    <div class="main-container">
+        <div class="top-panel">
+            <div id="video-container" class="card">
+                <h2>Live Feed & Attention</h2>
+                <img id="video-feed" src="/video_feed" alt="Live webcam feed">
+                <button id="capture-btn" onclick="captureAndPredict()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-camera-video-fill" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M0 5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.983 1.738l3.11-1.382A1 1 0 0 1 16 4.269v7.462a1 1 0 0 1-1.406.913l-3.11-1.382A2 2 0 0 1 9.5 13H2a2 2 0 0 1-2-2z"/>
+                    </svg>
+                    <span>Analyze Frame</span>
+                </button>
+            </div>
+
+            <div id="right-panel">
+                <div id="upload-card" class="card">
+                    <h2>Upload & Analyze</h2>
+                    <div class="upload-area">
+                        <input type="file" id="image-upload" accept="image/*" onchange="handleFileSelect(event)" style="display:none;">
+                        <label for="image-upload" class="upload-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"></path>
+                              <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 0-.708-.708z"></path>
+                            </svg>
+                            <span>Choose File</span>
+                        </label>
+                        <span id="file-name-display">No file chosen</span>
+                    </div>
+                    <button id="analyze-file-btn" onclick="uploadAndPredict()" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M6.502 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"></path>
+                            <path d="M14 14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4 1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2A1.5 1.5 0 0 1 9.5 3V1z"></path>
+                            <path d="M10.854 4.854a.5.5 0 0 0-.708-.708L7.5 6.793 6.354 5.646a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0z"></path>
+                        </svg>
+                        <span>Analyze File</span>
+                    </button>
+                </div>
+                <div id="prediction-card" class="card">
+                    <h2>Result</h2>
+                    <div id="prediction-display" class="placeholder">--</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="steps-card" class="card">
+            <h2>Analysis Pipeline</h2>
+            <div id="steps-container">
+                 <div class="placeholder">Processing steps will appear here.</div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <span>by</span> <img src="/MLI.png" alt="MLI Logo">
+    </footer>
+
+    <script>
+        function typeWriter(element, text, speed = 150) {
+            element.innerHTML = '';
+            element.classList.remove('placeholder');
+            let i = 0;
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+
+        async function captureAndPredict() {
+            const button = document.getElementById('capture-btn');
+            const buttonSpan = button.querySelector('span');
+            const predictionDisplay = document.getElementById('prediction-display');
+            const stepsContainer = document.getElementById('steps-container');
+
+            button.disabled = true;
+            buttonSpan.innerText = 'Analyzing...';
+            predictionDisplay.innerHTML = `<div class="placeholder"><div class="loader"></div></div>`;
+            stepsContainer.innerHTML = `<div class="placeholder"><div class="loader"></div></div>`;
+
+            try {
+                const response = await fetch('/capture');
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error);
+
+                typeWriter(predictionDisplay, data.prediction || 'N/A');
+
+                stepsContainer.innerHTML = `<img src="data:image/png;base64,${data.stepsImage}" alt="Preprocessing Steps">`;
+
+            } catch (error) {
+                console.error('Error during capture:', error);
+                predictionDisplay.innerText = '⚠️';
+                stepsContainer.innerHTML = `<div class="placeholder" style="color: #FF7B72;">Analysis Failed</div>`;
+            } finally {
+                button.disabled = false;
+                buttonSpan.innerText = 'Analyze Frame';
+            }
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            const fileNameDisplay = document.getElementById('file-name-display');
+            const analyzeBtn = document.getElementById('analyze-file-btn');
+
+            if (file) {
+                fileNameDisplay.textContent = file.name;
+                analyzeBtn.disabled = false;
+            } else {
+                fileNameDisplay.textContent = 'No file chosen';
+                analyzeBtn.disabled = true;
+            }
+        }
+
+        async function uploadAndPredict() {
+            const button = document.getElementById('analyze-file-btn');
+            const buttonSpan = button.querySelector('span');
+            const predictionDisplay = document.getElementById('prediction-display');
+            const stepsContainer = document.getElementById('steps-container');
+            const fileInput = document.getElementById('image-upload');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            button.disabled = true;
+            buttonSpan.innerText = 'Analyzing...';
+            predictionDisplay.innerHTML = `<div class="placeholder"><div class="loader"></div></div>`;
+            stepsContainer.innerHTML = `<div class="placeholder"><div class="loader"></div></div>`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error);
+
+                typeWriter(predictionDisplay, data.prediction || 'N/A');
+
+                stepsContainer.innerHTML = `<img src="data:image/png;base64,${data.stepsImage}" alt="Preprocessing Steps">`;
+
+            } catch (error) {
+                console.error('Error during upload:', error);
+                predictionDisplay.innerText = '⚠️';
+                stepsContainer.innerHTML = `<div class="placeholder" style="color: #FF7B72;">Analysis Failed</div>`;
+            } finally {
+                button.disabled = false;
+                buttonSpan.innerText = 'Analyze File';
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -195,7 +195,7 @@ def run_inference_demo(run_folder=None, num_samples=10):
 
 if __name__ == "__main__":
     # Run demo
-    run_inference_demo(run_folder="run_position", num_samples=100)
+    run_inference_demo(run_folder="run_25_06_26__2_02_92", num_samples=100)
     
     print("\n" + "="*50)
     print("Next: Run inference from your webcam.")
@@ -206,4 +206,4 @@ if __name__ == "__main__":
     # 🔥 LIVE ATTENTION VISUALIZATION! 🔥
     # This will show real-time attention overlay on your webcam feed
     # Watch as the model focuses on different parts of your digits!
-    infer_from_webcam(run_folder="run_position", visualize=True, show_attention=True)
+    infer_from_webcam(run_folder="run_25_06_26__2_02_92", visualize=True, show_attention=True)
