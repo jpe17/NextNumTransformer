@@ -50,7 +50,7 @@ class VisionTransformer(nn.Module):
                 'W_v': nn.Linear(embed_dim, embed_dim, bias=False), 'W_o': nn.Linear(embed_dim, embed_dim),
             }))
             self.encoder_ffn_layers.append(nn.Sequential(
-                nn.Linear(embed_dim, embed_dim * ffn_ratio), nn.ReLU(),
+                nn.Linear(embed_dim, embed_dim * ffn_ratio), nn.GELU(),
                 nn.Linear(embed_dim * ffn_ratio, embed_dim)
             ))
             self.encoder_norm1_layers.append(nn.LayerNorm(embed_dim))
@@ -65,6 +65,7 @@ class VisionTransformer(nn.Module):
         self.decoder_norm1_layers = nn.ModuleList()
         self.decoder_norm2_layers = nn.ModuleList()
         self.decoder_norm3_layers = nn.ModuleList()
+        self.dropout = nn.Dropout(0.2)
 
         for _ in range(num_layers):
             self.decoder_masked_attention_layers.append(nn.ModuleDict({
@@ -76,7 +77,7 @@ class VisionTransformer(nn.Module):
                 'W_v': nn.Linear(embed_dim, embed_dim, bias=False), 'W_o': nn.Linear(embed_dim, embed_dim),
             }))
             self.decoder_ffn_layers.append(nn.Sequential(
-                nn.Linear(embed_dim, embed_dim * ffn_ratio), nn.ReLU(),
+                nn.Linear(embed_dim, embed_dim * ffn_ratio), nn.GELU(),
                 nn.Linear(embed_dim * ffn_ratio, embed_dim)
             ))
             self.decoder_norm1_layers.append(nn.LayerNorm(embed_dim))
@@ -107,7 +108,8 @@ class VisionTransformer(nn.Module):
             V = attn_module['W_v'](x_norm).view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
             
             scores = (Q @ K.transpose(-2, -1)) / (self.head_dim ** 0.5)
-            weights = F.softmax(scores, dim=-1)
+            weights = F.softmax(scores / 2.0, dim=-1)  # Temperature scaling
+            weights = self.dropout(weights)
             attention_output = (weights @ V).transpose(1, 2).contiguous().view(batch_size, -1, self.embed_dim)
             x = residual + attn_module['W_o'](attention_output)
             
@@ -119,12 +121,11 @@ class VisionTransformer(nn.Module):
         encoder_output = x
 
         # --- Decoder Path ---
-        seq_len = tgt_tokens.size(1)
         y = self.token_embedding(tgt_tokens)
         y = y + self.decoder_pos_embedding
         
         # Causal Mask
-        causal_mask = ~torch.triu(torch.ones(seq_len, seq_len, device=tgt_tokens.device), diagonal=1).bool()
+        causal_mask = ~torch.triu(torch.ones(self.max_seq_len, self.max_seq_len, device=tgt_tokens.device), diagonal=1).bool()
 
         for i in range(self.num_layers):
             # Pre-Norm & Masked Attention
@@ -139,7 +140,8 @@ class VisionTransformer(nn.Module):
             
             scores = (Q @ K.transpose(-2, -1)) / (self.head_dim ** 0.5)
             scores = scores.masked_fill(causal_mask == 0, float('-inf'))
-            weights = F.softmax(scores, dim=-1)
+            weights = F.softmax(scores / 1.5, dim=-1)  # Temperature scaling
+            weights = self.dropout(weights)
             attention_output = (weights @ V).transpose(1, 2).contiguous().view(batch_size, -1, self.embed_dim)
             y = residual + attn_module['W_o'](attention_output)
 
@@ -155,7 +157,8 @@ class VisionTransformer(nn.Module):
             V = attn_module['W_v'](encoder_output_norm).view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
             
             scores = (Q @ K.transpose(-2, -1)) / (self.head_dim ** 0.5)
-            weights = F.softmax(scores, dim=-1)
+            weights = F.softmax(scores / 1.5, dim=-1)  # Temperature scaling
+            weights = self.dropout(weights)
             attention_output = (weights @ V).transpose(1, 2).contiguous().view(batch_size, -1, self.embed_dim)
             y = residual + attn_module['W_o'](attention_output)
 

@@ -1,7 +1,7 @@
 """
 Vision Transformer Inference
 ============================
-Simple inference script that reuses existing code.
+Simple inference script for webcam and demo testing.
 """
 
 import torch
@@ -11,11 +11,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from utils import load_trained_model, predict_sequence
-from attention_visualization import (
-    predict_with_attention, 
-    create_real_time_attention_overlay, 
-    visualize_attention_analysis
-)
+from attention_visualization import create_real_time_attention_overlay
 
 # Special tokens (keeping for backward compatibility, but they're imported in utils)
 SOS_TOKEN = 10
@@ -23,7 +19,14 @@ EOS_TOKEN = 11
 PAD_TOKEN = 12
 
 def _preprocess_image(image_path, model_config, kernel_size=(2, 2)):
-    """Loads and preprocesses an image for the model, returning patches and intermediate steps."""
+    """
+    Loads and preprocesses a REAL-WORLD image (camera/file) for the model.
+    
+    NOTE: This function is ONLY used for real-world images (webcam, uploads, etc.)
+    and NOT for synthetic test data, which is already in the correct format.
+    
+    Returns patches and intermediate steps for visualization.
+    """
     try:
         original_image = Image.open(image_path)
     except FileNotFoundError:
@@ -36,7 +39,7 @@ def _preprocess_image(image_path, model_config, kernel_size=(2, 2)):
     
     grayscale_image = transforms.Grayscale()(original_image)
     resized_image = transforms.Resize((canvas_height, canvas_width))(grayscale_image)
-    resized_image = np.clip(((np.array(resized_image, dtype=np.float32) / 255 -0.4)*10)+0.4, 0, 1)
+    resized_image = np.clip(((np.array(resized_image, dtype=np.float32) / 255 -0.45)*8)+0.45, 0, 1)
     
     # Main processing pipeline
     eroded_canvas = cv2.erode(resized_image, np.ones(kernel_size, np.uint8))
@@ -61,54 +64,6 @@ def _plot_steps(steps, prediction):
         axes[i].axis('off')
     plt.tight_layout()
     plt.show()
-
-def infer_from_image_path(image_path, run_folder=None):
-    """Run inference on a single image from a file path."""
-    print(f"=== Inference on Image from Path: {image_path} ===")
-    model, model_config = load_trained_model(run_folder=run_folder)
-    
-    patches, _ = _preprocess_image(image_path, model_config)
-    if patches is None: return
-
-    predicted_digits = predict_sequence(model, patches, model_config)
-    print(f"Prediction: {predicted_digits}")
-    return predicted_digits
-
-def visualize_and_predict_from_path(image_path, run_folder=None):
-    """Loads an image, shows preprocessing steps, and predicts digits."""
-    print(f"=== Visual Inference on Image from Path: {image_path} ===")
-    model, model_config = load_trained_model(run_folder=run_folder, verbose=False)
-    
-    # Make digits thicker by using a larger kernel for erosion
-    patches, steps = _preprocess_image(image_path, model_config, kernel_size=(2, 2))
-    if patches is None: return
-
-    predicted_digits = predict_sequence(model, patches, model_config)
-    print(f"Prediction: {predicted_digits}")
-    
-    _plot_steps(steps, predicted_digits)
-    return predicted_digits
-
-def predict_with_attention_visualization(image_path, run_folder=None):
-    """Loads an image and shows both preprocessing steps and attention analysis."""
-    print(f"=== Attention Inference on Image from Path: {image_path} ===")
-    model, model_config = load_trained_model(run_folder=run_folder, verbose=False)
-    
-    # Make digits thicker by using a larger kernel for erosion
-    patches, steps = _preprocess_image(image_path, model_config, kernel_size=(2, 2))
-    if patches is None: return
-
-    # Use attention-enhanced prediction
-    predicted_digits, attention_weights = predict_with_attention(model, patches, model_config)
-    print(f"Prediction: {predicted_digits}")
-    
-    # Show preprocessing steps
-    _plot_steps(steps, predicted_digits)
-    
-    # Show detailed attention analysis
-    visualize_attention_analysis(image_path, predicted_digits, attention_weights, model_config)
-    
-    return predicted_digits, attention_weights
 
 def infer_from_webcam(run_folder=None, visualize=False, show_attention=False):
     """
@@ -191,53 +146,17 @@ def infer_from_webcam(run_folder=None, visualize=False, show_attention=False):
             print(f"✅ Cropped image saved to {image_path}")
             
             # Run inference on the saved image using already loaded model
-            if visualize:
-                patches, steps = _preprocess_image(image_path, model_config, kernel_size=(2, 2))
-                if patches is not None:
-                    predicted_digits = predict_sequence(model, patches, model_config)
-                    print(f"Prediction: {predicted_digits}")
+            # REAL-WORLD CAMERA IMAGE: Apply preprocessing to convert to model format
+            patches, steps = _preprocess_image(image_path, model_config, kernel_size=(2, 2))
+            if patches is not None:
+                predicted_digits = predict_sequence(model, patches, model_config)
+                print(f"Prediction: {predicted_digits}")
+                if visualize:
                     _plot_steps(steps, predicted_digits)
-            else:
-                patches, _ = _preprocess_image(image_path, model_config)
-                if patches is not None:
-                    predicted_digits = predict_sequence(model, patches, model_config)
-                    print(f"Prediction: {predicted_digits}")
             break
             
     cap.release()
     cv2.destroyAllWindows()
-
-def infer_single_image(image_index=0, run_folder=None):
-    """Run inference on a single test image."""
-    print(f"=== Inference on Test Image {image_index} ===")
-    
-    # Load model and generate test data using model config
-    model, model_config = load_trained_model(run_folder=run_folder)
-    
-    # Generate test data that matches the model's expected input format
-    from data_processing import get_data
-    test_patches, test_labels = get_data('test', num_sequences=50, max_digits=model_config['max_digits'])
-    from data_processing import visualize_canvas_sequence
-    
-    if image_index >= len(test_patches):
-        print(f"❌ Index {image_index} out of range. Max: {len(test_patches)-1}")
-        return
-    
-    # Get ground truth
-    true_digits = [token.item() for token in test_labels[1][image_index] if token.item() < 10]
-    
-    # Visualize the image
-    visualize_canvas_sequence(test_patches, test_labels, sequence_idx=image_index)
-    
-    # Predict using modular function
-    predicted_digits = predict_sequence(model, test_patches[image_index], model_config)
-    
-    # Show results
-    print(f"Ground Truth: {true_digits}")
-    print(f"Prediction:   {predicted_digits}")
-    print(f"Correct: {'✅' if predicted_digits == true_digits else '❌'}")
-    
-    return predicted_digits, true_digits
 
 def run_inference_demo(run_folder=None, num_samples=10):
     """Demo inference on multiple test images."""
@@ -246,6 +165,7 @@ def run_inference_demo(run_folder=None, num_samples=10):
     # Load model and generate test data using model config
     model, model_config = load_trained_model(run_folder=run_folder)
     
+    # Generate SYNTHETIC test data - already in correct format, no processing needed
     from data_processing import get_data
     test_patches, test_labels = get_data('test', num_sequences=num_samples, max_digits=model_config['max_digits'])
     
@@ -254,7 +174,7 @@ def run_inference_demo(run_folder=None, num_samples=10):
     
     for i in range(total):
         true_digits = [token.item() for token in test_labels[1][i] if token.item() < 10]
-        # Use modular prediction function
+        # Direct prediction on synthetic test data - NO preprocessing applied
         predicted_digits = predict_sequence(model, test_patches[i], model_config)
         
         print(f"Image {i}: True={true_digits}, Pred={predicted_digits}, "
@@ -267,22 +187,15 @@ def run_inference_demo(run_folder=None, num_samples=10):
 
 if __name__ == "__main__":
     # Run demo
-    run_inference_demo(run_folder="run_25_06_26__1_32_33")
+    run_inference_demo(run_folder="run_gauss", num_samples=100)
     
     print("\n" + "="*50)
     print("Next: Run inference from your webcam.")
     print("A window will open with your webcam feed.")
-    print("Position your handwritten digits, then press 'c' to see the prediction and visualization.")
+    print("Position your handwritten digits, then press 'c' to see the prediction.")
     print("="*50 + "\n")
 
     # 🔥 LIVE ATTENTION VISUALIZATION! 🔥
     # This will show real-time attention overlay on your webcam feed
     # Watch as the model focuses on different parts of your digits!
-    infer_from_webcam(run_folder="run_25_06_26__1_32_33", visualize=True, show_attention=True)
-
-    predict_with_attention_visualization("webcam_capture.png", run_folder="run_25_06_26__1_32_33")
-
-    # Other examples:
-    # infer_single_image(image_index=3, run_folder="run_25_06_25__1_54_21") 
-    # infer_from_image_path('path/to/your/image.png', run_folder="run_25_06_25__1_54_21")
-    # infer_from_webcam(run_folder="run_25_06_25__1_54_21")  # Basic webcam without attention
+    infer_from_webcam(run_folder="run_gauss", visualize=True, show_attention=True)

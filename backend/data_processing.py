@@ -47,14 +47,15 @@ SOS_TOKEN = config['SOS_TOKEN']
 EOS_TOKEN = config['EOS_TOKEN']
 PAD_TOKEN = config['PAD_TOKEN']
 
-def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_digits=5):
+def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_digits=5, add_noise=False):
     """
     Completely revamped logic for clean images:
     1. Create a black canvas with torch.
     2. Paste original white-on-black MNIST digits onto it with random scaling and rotation.
        Overlaps are handled by taking the brightest pixel.
     3. Invert the final canvas to get black-on-white.
-    4. Then, and only then, create patches.
+    4. Add Gaussian noise if specified (training only).
+    5. Then, and only then, create patches.
     """
     all_canvas_patches = []
     all_decoder_inputs = []
@@ -131,13 +132,18 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
         
         # 4. Invert canvas to get black digits on white background
         final_canvas = 1 - canvas
+        
+        # 5. Add Gaussian noise if specified (training only)
+        if add_noise:
+            noise = torch.randn_like(final_canvas) * 0.05  # Small noise std
+            final_canvas = torch.clamp(final_canvas + noise, 0, 1)
 
-        # 5. Patch the final canvas
+        # 6. Patch the final canvas
         patches = final_canvas.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
         patches = patches.contiguous().view(-1, patch_size, patch_size)
         patches = patches.unsqueeze(1) # Add channel dim: [100, 1, 6, 6]
 
-        # 6. Create decoder input and target output sequences
+        # 7. Create decoder input and target output sequences
         decoder_input = [SOS_TOKEN] + sorted_labels
         decoder_input.extend([PAD_TOKEN] * (max_seq_len - len(decoder_input)))
 
@@ -265,4 +271,6 @@ def get_data(split='train', num_sequences=1000, max_digits=5, num_source_images=
         images = images[:num_source_images]
         img_labels = img_labels[:num_source_images]
         
-    return create_canvas_sequences(images, img_labels, num_sequences, max_digits)
+    # Add noise only to training data
+    add_noise = (split == 'train')
+    return create_canvas_sequences(images, img_labels, num_sequences, max_digits, add_noise)

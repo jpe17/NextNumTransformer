@@ -1,0 +1,39 @@
+{
+  "method": "bayes",
+  "metric": {
+    "name": "val_accuracy",
+    "goal": "maximize"
+  },
+  "parameters": {
+    "learning_rate": {
+      "distribution": "log_uniform_values",
+      "min": 0.00001,
+      "max": 0.01
+    },
+    "embed_dim": {
+      "values": [32, 64, 128]
+    },
+    "num_heads": {
+      "values": [2, 4, 8]
+    },
+    "num_layers": {
+      "values": [2, 3, 4]
+    },
+    "ffn_ratio": {
+      "values": [2, 4]
+    },
+    "batch_size": {
+      "values": [64, 128, 256]
+    },
+    "num_epochs": {
+      "value": 10
+    },
+    "max_digits": {
+      "values": [5]
+    }
+  },
+  "early_terminate": {
+    "type": "hyperband",
+    "min_iter": 10
+  }
+} 
