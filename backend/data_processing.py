@@ -77,7 +77,12 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
         
         # 3. Paste digits with controlled, CAPTCHA-like overlap
         positions = []
-        current_x = random.randint(0, 5)  # Start with small random horizontal padding
+        
+        # Estimate the total width of the sequence to allow for more random placement
+        avg_advance = 14 
+        estimated_sequence_width = digit_size + (num_digits - 1) * avg_advance
+        max_start_x = max(0, canvas_width - estimated_sequence_width)
+        current_x = random.randint(0, max_start_x)  # Start with larger random horizontal padding
 
         for idx in indices:
             # Stop if the next digit would go off the canvas
@@ -133,9 +138,9 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
         # 4. Invert canvas to get black digits on white background
         final_canvas = 1 - canvas
         
-        # 5. Add Gaussian noise if specified (training only)
-        if add_noise:
-            noise = torch.randn_like(final_canvas) * 0.05  # Small noise std
+        # 5. Add Gaussian noise if specified (training only, and only for 20% of samples)
+        if add_noise and random.random() < 0.2:
+            noise = torch.randn_like(final_canvas) * 0.1  # Small noise std
             final_canvas = torch.clamp(final_canvas + noise, 0, 1)
 
         # 6. Patch the final canvas

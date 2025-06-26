@@ -97,7 +97,7 @@ def load_trained_model(run_folder=None, artifacts_dir=None, verbose=True):
     # Ensure derived parameters are consistent
     model_config = derive_model_params(saved_config)
     
-    # Import model here to avoid circular imports
+    # Dynamically import the model class to avoid circular imports at the top level
     from model import VisionTransformer
     
     # Create model config for VisionTransformer constructor

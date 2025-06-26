@@ -18,19 +18,27 @@ SOS_TOKEN = 10
 EOS_TOKEN = 11
 PAD_TOKEN = 12
 
-def _preprocess_image(image_path, model_config, kernel_size=(2, 2)):
+def _preprocess_image(image_source, model_config, kernel_size=(2, 2)):
     """
     Loads and preprocesses a REAL-WORLD image (camera/file) for the model.
+    
+    Args:
+        image_source: A file path (string) or a PIL Image object.
     
     NOTE: This function is ONLY used for real-world images (webcam, uploads, etc.)
     and NOT for synthetic test data, which is already in the correct format.
     
     Returns patches and intermediate steps for visualization.
     """
-    try:
-        original_image = Image.open(image_path)
-    except FileNotFoundError:
-        print(f"❌ Image not found at {image_path}"); return None, None
+    if isinstance(image_source, str):
+        try:
+            original_image = Image.open(image_source)
+        except FileNotFoundError:
+            print(f"❌ Image not found at {image_source}"); return None, None
+    elif isinstance(image_source, Image.Image):
+        original_image = image_source
+    else:
+        raise TypeError("image_source must be a file path (str) or a PIL Image object.")
 
     # Get dimensions from model config
     canvas_height = model_config['canvas_height']
@@ -187,7 +195,7 @@ def run_inference_demo(run_folder=None, num_samples=10):
 
 if __name__ == "__main__":
     # Run demo
-    run_inference_demo(run_folder="run_gauss", num_samples=100)
+    run_inference_demo(run_folder="run_position", num_samples=100)
     
     print("\n" + "="*50)
     print("Next: Run inference from your webcam.")
@@ -198,4 +206,4 @@ if __name__ == "__main__":
     # 🔥 LIVE ATTENTION VISUALIZATION! 🔥
     # This will show real-time attention overlay on your webcam feed
     # Watch as the model focuses on different parts of your digits!
-    infer_from_webcam(run_folder="run_gauss", visualize=True, show_attention=True)
+    infer_from_webcam(run_folder="run_position", visualize=True, show_attention=True)

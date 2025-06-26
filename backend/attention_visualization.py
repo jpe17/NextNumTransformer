@@ -7,6 +7,8 @@ import torch
 import torch.nn.functional as F
 import cv2
 import numpy as np
+from PIL import Image
+from torchvision import transforms
 
 # Token definitions (matching utils.py)
 SOS_TOKEN = 10
@@ -142,6 +144,55 @@ def create_attention_heatmap(attention_weights, canvas_shape, patch_size):
     
     return heatmap
 
+def get_attention_heatmap_and_prediction(cropped_frame, model, model_config):
+    """
+    Analyzes a cropped frame to get the attention heatmap and prediction.
+    This is a helper for the web app to allow for throttled updates.
+    """
+    try:
+        # Preprocessing - ALIGNED WITH `inference._preprocess_image`
+        # Convert to PIL Image for compatibility with _preprocess_image
+        pil_image = Image.fromarray(cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB))
+        
+        # We can't use _preprocess_image directly because it returns steps,
+        # but we can use its tested logic.
+        canvas_height = model_config['canvas_height']
+        canvas_width = model_config['canvas_width']
+        patch_size = model_config['patch_size']
+        
+        grayscale_image = transforms.Grayscale()(pil_image)
+        resized_image = transforms.Resize((canvas_height, canvas_width))(grayscale_image)
+        resized_np = np.clip(((np.array(resized_image, dtype=np.float32) / 255.0 - 0.45) * 8) + 0.45, 0, 1)
+        eroded_canvas = cv2.erode(resized_np, np.ones((2, 2), np.uint8))
+        thickened_canvas = torch.from_numpy(eroded_canvas.astype(np.float32))
+
+        # Use the correct, efficient patchifying method
+        patches = thickened_canvas.unsqueeze(0).unfold(1, patch_size, patch_size).unfold(2, patch_size, patch_size)
+        patches = patches.contiguous().view(-1, patch_size, patch_size).unsqueeze(1)
+        
+        # Get prediction and attention
+        predicted_digits, attention_weights = predict_with_attention_capture(model, patches, model_config)
+        
+        if predicted_digits and attention_weights is not None:
+            # Create heatmap
+            heatmap = create_attention_heatmap(
+                attention_weights, 
+                (canvas_height, canvas_width), 
+                patch_size
+            )
+            
+            # Resize heatmap to match original crop size
+            h, w, _ = cropped_frame.shape
+            heatmap_resized = cv2.resize(heatmap, (w, h))
+            heatmap_colored = cv2.applyColorMap((heatmap_resized * 255).astype(np.uint8), cv2.COLORMAP_HOT)
+            
+            return heatmap_colored, predicted_digits
+            
+    except Exception as e:
+        print(f"Attention heatmap generation error: {e}")
+    
+    return None, None
+
 def create_real_time_attention_overlay(frame, model, model_config, crop_coords, alpha=0.3):
     """
     Create real-time attention overlay on webcam frame.
@@ -151,18 +202,23 @@ def create_real_time_attention_overlay(frame, model, model_config, crop_coords, 
         x1, y1, x2, y2 = crop_coords
         cropped = frame[y1:y2, x1:x2]
         
-        # Preprocessing
+        # Preprocessing - ALIGNED WITH `inference._preprocess_image`
         gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
         resized = cv2.resize(gray, (model_config['canvas_width'], model_config['canvas_height']))
-        normalized = resized.astype(np.float32) / 255.0
         
-        # Convert to patches
+        # Apply the exact same contrast enhancement and erosion as the inference script
+        processed_image = np.clip(((resized.astype(np.float32) / 255.0 - 0.45) * 8) + 0.45, 0, 1)
+        eroded_image = cv2.erode(processed_image, np.ones((2, 2), np.uint8))
+
+        # Convert to patches from the correctly processed image
         patch_size = model_config['patch_size']
         patches = []
         for i in range(0, model_config['canvas_height'], patch_size):
             for j in range(0, model_config['canvas_width'], patch_size):
-                patches.append(normalized[i:i+patch_size, j:j+patch_size])
-        patches = torch.tensor(patches).unsqueeze(1)
+                patches.append(eroded_image[i:i+patch_size, j:j+patch_size])
+        
+        # Create tensor correctly to avoid performance warnings
+        patches = torch.from_numpy(np.array(patches)).unsqueeze(1).float()
         
         # Get prediction and attention
         predicted_digits, attention_weights = predict_with_attention_capture(model, patches, model_config)

@@ -5,11 +5,8 @@ opencv-python
 numpy
 matplotlib
 wandb
+flask
+gunicorn
 dash
 dash-bootstrap-components
-python-multipart
-pillow
-aiofiles
-streamlit
-streamlit-webrtc
-av
+plotly
