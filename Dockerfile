@@ -1,11 +1,11 @@
 # --- Build Stage ---
 # Use a slim Python image for the build environment
-FROM python:3.9-slim as builder
+FROM python:3.9-slim AS builder
 
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies required for opencv-python and other libraries
+# Install system dependencies required for opencv-python
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
@@ -27,12 +27,11 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy necessary application files
+# Copy necessary application files from the new structure
 COPY app.py .
 COPY backend/ ./backend/
-COPY templates/ ./templates/
-COPY logo.png .
-COPY MLI.png .
+COPY frontend/ ./frontend/
+COPY artifacts/ ./artifacts/
 
 # Expose the port the app runs on
 EXPOSE 5001

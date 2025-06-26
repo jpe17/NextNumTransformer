@@ -324,7 +324,7 @@
 <body>
     <header class="header">
         <h1>
-            <img src="/logo.png" alt="Logo" class="title-logo">ision <span class="highlight">Spotlight</span>
+            <img src="/static/logo.png" alt="Logo" class="title-logo">ision <span class="highlight">Spotlight</span>
         </h1>
         <p>See what the AI sees. Real-time attention on demand.</p>
     </header>
@@ -381,10 +381,16 @@
     </div>
 
     <footer class="footer">
-        <span>by</span> <img src="/MLI.png" alt="MLI Logo">
+        <span>by</span> <img src="/static/MLI.png" alt="MLI Logo">
     </footer>
 
     <script>
+        // Set video feed URL with cache busting parameter
+        document.addEventListener('DOMContentLoaded', function() {
+            const videoFeed = document.getElementById('video-feed');
+            videoFeed.src = '/video_feed?t=' + Date.now();
+        });
+
         function typeWriter(element, text, speed = 150) {
             element.innerHTML = '';
             element.classList.remove('placeholder');

@@ -16,6 +16,7 @@ from torchvision.transforms import transforms
 from utils import load_config, derive_model_params
 
 # Load config and derive parameters
+# The config path is now relative to the project root where scripts are run
 config = load_config('backend/config.json')
 if config is None:
     raise ValueError("Could not load config.json")

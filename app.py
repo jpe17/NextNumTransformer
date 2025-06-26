@@ -10,18 +10,15 @@ import matplotlib
 matplotlib.use('Agg') # Use non-interactive backend
 import matplotlib.pyplot as plt
 
-# Add the backend directory to the Python path to allow direct imports
-backend_path = os.path.join(os.path.dirname(__file__), 'backend')
-sys.path.insert(0, backend_path)
-
-# Backend script imports (now direct)
+# Backend script imports are now absolute from the project root
 from utils import load_trained_model, predict_sequence
 from inference import _preprocess_image
 from attention_visualization import get_attention_heatmap_and_prediction
 
 # --- Initialization ---
 print("🤖 Loading model...")
-MODEL_RUN_FOLDER = "run_position"
+# Model path is now relative to the backend directory
+MODEL_RUN_FOLDER = "run_position" 
 model, model_config = load_trained_model(run_folder=MODEL_RUN_FOLDER, verbose=True)
 print("✅ Model loaded.")
 
@@ -31,7 +28,8 @@ if not cap.isOpened():
     raise IOError("Cannot open webcam")
 print("✅ Camera initialized.")
 
-app = Flask(__name__)
+# Configure Flask with new template and static folder paths
+app = Flask(__name__, template_folder='frontend/templates', static_folder='frontend/static')
 
 # --- Helper Functions ---
 
@@ -76,7 +74,11 @@ def plot_steps_to_base64(steps, prediction):
 @app.route('/')
 def index():
     """Render the main page."""
-    return render_template('index.html')
+    response = app.make_response(render_template('index.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 def gen_frames():
     """Generator for video streaming with throttled attention analysis."""
@@ -130,7 +132,11 @@ def gen_frames():
 @app.route('/video_feed')
 def video_feed():
     """Video streaming route."""
-    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    response = Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/capture')
 def capture():
@@ -189,16 +195,6 @@ def upload():
             return {"error": "Failed to process the uploaded image."}, 500
             
     return {"error": "File upload failed for an unknown reason."}, 400
-
-@app.route('/MLI.png')
-def serve_logo():
-    """Serves the MLI.png logo file from the root directory."""
-    return send_from_directory(app.root_path, 'MLI.png')
-
-@app.route('/logo.png')
-def serve_header_logo():
-    """Serves the logo.png file from the root directory."""
-    return send_from_directory(app.root_path, 'logo.png')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
