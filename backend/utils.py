@@ -9,19 +9,36 @@ EOS_TOKEN = 11  # End of Sequence
 PAD_TOKEN = 12  # Padding token
 
 def load_config(filepath):
-  """Loads a JSON configuration file and returns it as a dictionary."""
-  try:
-    with open(filepath, 'r') as f:
-      config = json.load(f)
-      return config
-  except FileNotFoundError:
-    print(f"Error: File not found at {filepath}")
-    return None
-  except json.JSONDecodeError:
-    print(f"Error: Invalid JSON format in {filepath}")
-    return None
+    """Loads a JSON configuration file and returns it as a dictionary."""
+    try:
+        with open(filepath, 'r') as f:
+            config = json.load(f)
+            return config
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except json.JSONDecodeError:
+        print(f"Error: Invalid JSON format in {filepath}")
+        return None
 
-def find_latest_run_dir(artifacts_dir='None'):
+def derive_model_params(config):
+    """Derive model parameters from basic config to ensure consistency."""
+    canvas_height = config['canvas_height']
+    canvas_width = config['canvas_width'] 
+    patch_size = config['patch_size']
+    
+    # Derived parameters that must be consistent
+    num_patches = (canvas_height // patch_size) * (canvas_width // patch_size)
+    patch_dim = patch_size * patch_size  # For grayscale images
+    
+    # Return config with derived parameters
+    derived_config = config.copy()
+    derived_config['num_patches'] = num_patches
+    derived_config['patch_dim'] = patch_dim
+    
+    return derived_config
+
+def find_latest_run_dir(artifacts_dir=None):
     """Find the latest run directory in artifacts."""
     if artifacts_dir is None:
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -77,23 +94,26 @@ def load_trained_model(run_folder=None, artifacts_dir=None, verbose=True):
     with open(config_file, 'r') as f:
         saved_config = json.load(f)
     
-    # Model config from saved config
-    model_config = {
-        'patch_dim': saved_config['patch_dim'],
-        'embed_dim': saved_config['embed_dim'],
-        'num_patches': saved_config['num_patches'],
-        'num_heads': saved_config['num_heads'],
-        'num_layers': saved_config['num_layers'],
-        'ffn_ratio': saved_config['ffn_ratio'],
-        'vocab_size': saved_config['vocab_size'],
-        'max_seq_len': saved_config['max_seq_len']
-    }
+    # Ensure derived parameters are consistent
+    model_config = derive_model_params(saved_config)
     
     # Import model here to avoid circular imports
     from model import VisionTransformer
     
+    # Create model config for VisionTransformer constructor
+    vit_config = {
+        'patch_dim': model_config['patch_dim'],
+        'embed_dim': model_config['embed_dim'],
+        'num_patches': model_config['num_patches'],
+        'num_heads': model_config['num_heads'],
+        'num_layers': model_config['num_layers'],
+        'ffn_ratio': model_config['ffn_ratio'],
+        'vocab_size': model_config['vocab_size'],
+        'max_seq_len': model_config['max_seq_len']
+    }
+    
     # Load model
-    model = VisionTransformer(**model_config)
+    model = VisionTransformer(**vit_config)
     model.load_state_dict(torch.load(model_path, map_location='cpu'))
     model.eval()
     

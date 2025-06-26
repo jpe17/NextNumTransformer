@@ -7,7 +7,7 @@ import torch
 import os
 import json
 from datetime import datetime
-from data_processing import get_data
+from data_processing import get_data, save_canvas_sequence
 from model import VisionTransformer
 from training import train_model
 from torch.utils.data import TensorDataset, DataLoader
@@ -18,9 +18,13 @@ from analysis_tools import (
     show_prediction_mistakes,
     show_prediction_example
 )
-from utils import load_config
+from utils import load_config, derive_model_params
 
 config = load_config('backend/config.json')
+if config is None:
+    raise ValueError("Could not load config.json")
+
+config = derive_model_params(config)
 
 
 def main():
@@ -37,34 +41,42 @@ def main():
     print("Loading and processing data...")
     train_canvas_patches, (train_decoder_inputs, train_target_outputs) = get_data(
         'train', 
-        num_sequences=config.get('num_train_sequences'), 
-        max_digits=config.get('max_digits'),
-        num_source_images=config.get('num_train_images')
+        num_sequences=config['num_train_sequences'], 
+        max_digits=config['max_digits'],
+        num_source_images=config['num_train_images']
     )
     val_canvas_patches, (val_decoder_inputs, val_target_outputs) = get_data(
         'val',
-        num_sequences=config.get('num_val_sequences'),
-        max_digits=config.get('max_digits'),
-        num_source_images=config.get('num_val_images')
+        num_sequences=config['num_val_sequences'],
+        max_digits=config['max_digits'],
+        num_source_images=config['num_val_images']
     )
     
     # Create datasets and dataloaders
     train_dataset = TensorDataset(train_canvas_patches, train_decoder_inputs, train_target_outputs)
     val_dataset = TensorDataset(val_canvas_patches, val_decoder_inputs, val_target_outputs)
     
-    train_loader = DataLoader(train_dataset, batch_size=config.get('batch_size'), shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=config.get('batch_size'), shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False)
         
-    # Create model
+    # Save a sample sequence
+    save_canvas_sequence(
+        train_canvas_patches, 
+        (train_decoder_inputs, train_target_outputs), 
+        num_to_save=30, 
+        save_dir="canvas"
+    )
+    
+    # Create model with config parameters
     model_config = {
-        'patch_dim': config.get('patch_dim'),
-        'embed_dim': config.get('embed_dim'),
-        'num_patches': config.get('num_patches'),
-        'num_heads': config.get('num_heads'),
+        'patch_dim': config['patch_dim'],
+        'embed_dim': config['embed_dim'],
+        'num_patches': config['num_patches'],
+        'num_heads': config['num_heads'],
         'num_layers': config['num_layers'],
-        'ffn_ratio': config.get('ffn_ratio'),
-        'vocab_size': config.get('vocab_size'),
-        'max_seq_len': config.get('max_seq_len')
+        'ffn_ratio': config['ffn_ratio'],
+        'vocab_size': config['vocab_size'],
+        'max_seq_len': config['max_seq_len']
     }
     model = VisionTransformer(**model_config)
     
@@ -85,7 +97,7 @@ def main():
     
     # Train the model
     print("=== Training ===")
-    history = train_model(model, train_loader, val_loader, model_config, epochs=config['num_epochs'], lr=config['learning_rate'], artifacts_dir=artifacts_dir)
+    history = train_model(model, train_loader, val_loader, config, epochs=config['num_epochs'], lr=config['learning_rate'], artifacts_dir=artifacts_dir)
 
     # --- Analysis ---
     print("\n\n=== Post-Training Analysis ===")

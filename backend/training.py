@@ -15,7 +15,7 @@ from utils import load_config
 config = load_config('backend/config.json')
 
 
-def train_model(model, train_loader, val_loader, model_config, epochs=10, lr=0.001, pad_token_id=12, artifacts_dir="artifacts"):
+def train_model(model, train_loader, val_loader, full_config, epochs=10, lr=0.001, pad_token_id=12, artifacts_dir="artifacts"):
     # Create timestamp for this training run
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"training_{timestamp}"
@@ -32,7 +32,7 @@ def train_model(model, train_loader, val_loader, model_config, epochs=10, lr=0.0
     # Save config immediately before training starts
     config_path = os.path.join(run_dir, "model_config.json")
     with open(config_path, 'w') as f:
-        json.dump(config, f, indent=2)
+        json.dump(full_config, f, indent=2)
     print(f"📋 Config saved to: {config_path}")
     
     criterion = nn.CrossEntropyLoss(ignore_index=pad_token_id)
@@ -84,13 +84,22 @@ def train_model(model, train_loader, val_loader, model_config, epochs=10, lr=0.0
             running_correct += (predicted[mask] == target_outputs[mask]).sum().item()
             running_total += mask.sum().item()
             
+            # Calculate current batch metrics
+            curr_loss = running_loss / (batch_idx + 1)
+            curr_acc = 100 * running_correct / running_total if running_total > 0 else 0
+            
+            # Log batch-level metrics to wandb
+            wandb.log({
+                "batch/train_loss": curr_loss,
+                "batch/train_accuracy": curr_acc,
+                "batch": epoch * len(train_loader) + batch_idx
+            })
+            
             # Show first batch tensor flow
             if epoch == 0 and batch_idx == 0:
                 print("--- First batch tensor flow ---")
             
             # Update progress bar with current stats
-            curr_loss = running_loss / (batch_idx + 1)
-            curr_acc = 100 * running_correct / running_total if running_total > 0 else 0
             pbar.set_postfix({'Loss': f'{curr_loss:.4f}', 'Acc': f'{curr_acc:.1f}%'})
         
         # Validation

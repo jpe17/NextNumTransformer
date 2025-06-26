@@ -76,26 +76,28 @@ def plot_training_curves(history):
     print()
 
 
-def predict_sequences(model, canvas_patches, max_len=6):
+def predict_sequences(model, canvas_patches):
     """
     Greedy decoding for sequence prediction.
     """
     model.eval()
     batch_size = canvas_patches.size(0)
+    max_len = model.max_seq_len  # Get max_seq_len from the model
     
-    # Start with SOS token
-    decoder_input = torch.full((batch_size, 1), SOS_TOKEN, dtype=torch.long, device=canvas_patches.device)
+    # Create decoder input padded to max_len with PAD tokens
+    decoder_input = torch.full((batch_size, max_len), PAD_TOKEN, dtype=torch.long, device=canvas_patches.device)
+    decoder_input[:, 0] = SOS_TOKEN  # Set first token to SOS
     
     with torch.no_grad():
-        for _ in range(max_len - 1):
+        for pos in range(1, max_len):
             logits = model(canvas_patches, decoder_input)
             
-            # Get the last token prediction
-            next_token_logits = logits[:, -1, :]
-            next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(1)
+            # Get the prediction for the current position
+            next_token_logits = logits[:, pos-1, :]  # Use pos-1 because we predict the next token
+            next_token = torch.argmax(next_token_logits, dim=-1)
             
-            # Append to the sequence
-            decoder_input = torch.cat([decoder_input, next_token], dim=1)
+            # Set the token at the current position
+            decoder_input[:, pos] = next_token
 
     return decoder_input
 

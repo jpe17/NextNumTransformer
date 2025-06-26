@@ -1,14 +1,12 @@
 {
-    "patch_dim": 36,
-    "embed_dim": 2048,
-    "num_patches": 100,
-    "num_heads": 4,
-    "num_layers": 8,
+    "embed_dim": 128,
+    "num_heads": 2,
+    "num_layers": 4,
     "ffn_ratio": 2,
     "vocab_size": 13,
     "max_seq_len": 6,
-    "batch_size": 512,
-    "num_epochs": 50,
+    "batch_size": 256,
+    "num_epochs": 100,
     "learning_rate": 0.0001,
     "SOS_TOKEN": 10,
     "EOS_TOKEN": 11,
@@ -19,5 +17,8 @@
     "num_val_sequences": 10000,
     "num_train_sequences": 42000,
     "train_split": 0.7,
-    "val_split": 0.85
+    "val_split": 0.85,
+    "canvas_height": 30,
+    "canvas_width": 96,
+    "patch_size": 6
 }
