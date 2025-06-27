@@ -9,8 +9,15 @@ import torch.optim as optim
 from tqdm import tqdm
 import wandb
 import os
+import sys
 from datetime import datetime
-from utils import load_config
+
+# Add project root to Python path for consistent imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from backend.utils import load_config
 
 config = load_config('backend/config.json')
 

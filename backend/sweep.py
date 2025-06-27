@@ -7,11 +7,18 @@ Just run this file to start a sweep with config_sweep.json parameters!
 import json
 import torch
 import wandb
+import sys
+import os
 from torch.utils.data import TensorDataset, DataLoader
 
-from data_processing import get_data
-from model import VisionTransformer
-from utils import load_config, derive_model_params
+# Add project root to Python path for consistent imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from backend.data_processing import get_data
+from backend.model import VisionTransformer
+from backend.utils import load_config, derive_model_params
 
 seed = 42
 torch.manual_seed(seed)

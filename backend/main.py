@@ -6,19 +6,26 @@ Simple Vision Transformer Demo
 import torch
 import os
 import json
+import sys
 from datetime import datetime
-from data_processing import get_data, save_canvas_sequence
-from model import VisionTransformer
-from training import train_model
 from torch.utils.data import TensorDataset, DataLoader
-from analysis_tools import (
+
+# Add project root to Python path for consistent imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from backend.data_processing import get_data, save_canvas_sequence
+from backend.model import VisionTransformer
+from backend.training import train_model
+from backend.analysis_tools import (
     analyze_training_history,
     show_learning_insights,
     analyze_sequence_predictions,
     show_prediction_mistakes,
     show_prediction_example
 )
-from utils import load_config, derive_model_params
+from backend.utils import load_config, derive_model_params
 
 config = load_config('backend/config.json')
 if config is None:

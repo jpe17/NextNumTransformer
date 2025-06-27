@@ -8,7 +8,15 @@ Clean visualization and analysis tools for understanding model performance.
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-from data_processing import SOS_TOKEN, EOS_TOKEN, PAD_TOKEN, visualize_canvas_sequence
+import sys
+import os
+
+# Add project root to Python path for consistent imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from backend.data_processing import SOS_TOKEN, EOS_TOKEN, PAD_TOKEN, visualize_canvas_sequence
 
 
 def analyze_training_history(history, detailed=True):

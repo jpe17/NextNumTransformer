@@ -11,9 +11,9 @@ matplotlib.use('Agg') # Use non-interactive backend
 import matplotlib.pyplot as plt
 
 # Backend script imports are now absolute from the project root
-from utils import load_trained_model, predict_sequence
-from inference import _preprocess_image
-from attention_visualization import get_attention_heatmap_and_prediction
+from backend.utils import load_trained_model, predict_sequence
+from backend.inference import _preprocess_image
+from backend.attention_visualization import get_attention_heatmap_and_prediction
 
 # --- Initialization ---
 print("🤖 Loading model...")
@@ -151,16 +151,23 @@ def capture():
     x1, y1, x2, y2 = get_crop_coords(frame, model_config)
     cropped_frame = frame[y1:y2, x1:x2]
     
-    # Convert for preprocessing
-    pil_image = Image.fromarray(cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2RGB))
+    # Save and reload like inference.py does for consistent processing
+    temp_path = "temp_capture.png"
+    cv2.imwrite(temp_path, cropped_frame)
     
-    # Get prediction and visualization steps
-    patches, steps = _preprocess_image(pil_image, model_config, kernel_size=(2, 2))
+    # Get prediction and visualization steps (same as inference.py)
+    patches, steps = _preprocess_image(temp_path, model_config, kernel_size=(2, 2))
     predicted_digits = predict_sequence(model, patches, model_config) if patches is not None else []
     prediction_str = ''.join(map(str, predicted_digits)) if predicted_digits else "N/A"
     
     # Generate plot
     steps_img_b64 = plot_steps_to_base64(steps, prediction_str)
+    
+    # Clean up temporary file
+    try:
+        os.remove(temp_path)
+    except:
+        pass
     
     return {
         "prediction": prediction_str,
@@ -178,13 +185,22 @@ def upload():
 
     if file:
         try:
+            # Save uploaded file temporarily to match inference.py processing
+            temp_path = "temp_upload.png"
             pil_image = Image.open(file.stream)
+            pil_image.save(temp_path)
             
-            patches, steps = _preprocess_image(pil_image, model_config, kernel_size=(2, 2))
+            patches, steps = _preprocess_image(temp_path, model_config, kernel_size=(2, 2))
             predicted_digits = predict_sequence(model, patches, model_config) if patches is not None else []
             prediction_str = ''.join(map(str, predicted_digits)) if predicted_digits else "N/A"
             
             steps_img_b64 = plot_steps_to_base64(steps, prediction_str)
+            
+            # Clean up temporary file
+            try:
+                os.remove(temp_path)
+            except:
+                pass
             
             return {
                 "prediction": prediction_str,

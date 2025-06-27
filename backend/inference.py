@@ -10,8 +10,16 @@ from torchvision import transforms
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from utils import load_trained_model, predict_sequence
-from attention_visualization import create_real_time_attention_overlay
+import sys
+import os
+
+# Add project root to Python path for consistent imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from backend.utils import load_trained_model, predict_sequence
+from backend.attention_visualization import create_real_time_attention_overlay
 
 # Special tokens (keeping for backward compatibility, but they're imported in utils)
 SOS_TOKEN = 10
@@ -174,7 +182,7 @@ def run_inference_demo(run_folder=None, num_samples=10):
     model, model_config = load_trained_model(run_folder=run_folder)
     
     # Generate SYNTHETIC test data - already in correct format, no processing needed
-    from data_processing import get_data
+    from backend.data_processing import get_data
     test_patches, test_labels = get_data('test', num_sequences=num_samples, max_digits=model_config['max_digits'])
     
     correct = 0
@@ -195,7 +203,7 @@ def run_inference_demo(run_folder=None, num_samples=10):
 
 if __name__ == "__main__":
     # Run demo
-    run_inference_demo(run_folder="run_25_06_26__2_14_05", num_samples=100)
+    run_inference_demo(run_folder="run_25_06_26__2_32_62", num_samples=100)
     
     print("\n" + "="*50)
     print("Next: Run inference from your webcam.")
@@ -206,4 +214,4 @@ if __name__ == "__main__":
     # 🔥 LIVE ATTENTION VISUALIZATION! 🔥
     # This will show real-time attention overlay on your webcam feed
     # Watch as the model focuses on different parts of your digits!
-    infer_from_webcam(run_folder="run_25_06_26__2_14_05", visualize=True, show_attention=True)
+    infer_from_webcam(run_folder="run_25_06_26__2_32_62", visualize=True, show_attention=True)

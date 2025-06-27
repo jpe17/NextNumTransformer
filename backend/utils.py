@@ -2,6 +2,12 @@ import json
 import torch
 import os
 import glob
+import sys
+
+# Add project root to Python path for consistent imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Token definitions for sequence generation
 SOS_TOKEN = 10  # Start of Sequence
@@ -98,7 +104,7 @@ def load_trained_model(run_folder=None, artifacts_dir=None, verbose=True):
     model_config = derive_model_params(saved_config)
     
     # Dynamically import the model class to avoid circular imports
-    from model import VisionTransformer
+    from backend.model import VisionTransformer
     
     # Create model config for VisionTransformer constructor
     vit_config = {

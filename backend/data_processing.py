@@ -10,10 +10,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
+import sys
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
-from utils import load_config, derive_model_params
+
+# Add project root to Python path for consistent imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from backend.utils import load_config, derive_model_params
 
 # Load config and derive parameters
 # The config path is now relative to the project root where scripts are run
