@@ -31,7 +31,7 @@ Input Images → Patch Embedding → Positional Encoding → Multi-Head Attentio
 
 ### Data Processing Pipeline
 
-![Preprocessing Pipeline](preprocessing.png)
+![Demo](data_processing.png)
 
 The preprocessing pipeline transforms raw webcam input through:
 1. **Grayscale Conversion**: Reduces computational complexity
@@ -39,6 +39,8 @@ The preprocessing pipeline transforms raw webcam input through:
 3. **Morphological Operations**: Enhances digit boundaries with erosion/dilation
 4. **Patch Extraction**: Converts 2D images to sequence of spatial patches
 5. **Normalization**: Standardizes input distribution for stable training
+
+![Preprocessing Pipeline](preprocessing.png)
 
 ## 🔬 Technical Implementation
 
