@@ -5,10 +5,8 @@ Simple Sequential Data Processing
 
 import torch
 import random
-import json
 import matplotlib.pyplot as plt
 import numpy as np
-import cv2
 import os
 import sys
 from torch.utils.data import DataLoader
@@ -48,23 +46,15 @@ DATA_SPLITS = {
     'test': (ALL_IMAGES[val_end:], ALL_LABELS[val_end:])
 }
 
-# --- Canvas and Sequence Generation ---
-
 # Define special tokens for the decoder
 SOS_TOKEN = config['SOS_TOKEN']
 EOS_TOKEN = config['EOS_TOKEN']
 PAD_TOKEN = config['PAD_TOKEN']
 
-def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_digits=5, add_noise=False):
+def create_sequences(digit_images, digit_labels, num_sequences=1000, max_digits=5):
     """
-    Completely revamped logic for clean images:
-    1. Create a black canvas with torch.
-    2. Paste original white-on-black MNIST digits onto it with random scaling and rotation.
-       Overlaps are handled by taking the brightest pixel.
-    3. Invert the final canvas to get black-on-white.
-    4. Add Gaussian noise if specified (training only).
-    5. Apply inference-style preprocessing (contrast, erosion) to simulate real-world images.
-    6. Then, and only then, create patches.
+    Creates sequences of digits by placing them on a fixed-size canvas.
+    This is a simplified version that places digits horizontally without complex transformations.
     """
     all_canvas_patches = []
     all_decoder_inputs = []
@@ -77,101 +67,53 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
     digit_size = 28  # Original MNIST digit size
 
     for _ in range(num_sequences):
-        # 1. Pick 1-5 images
         num_digits = random.randint(1, max_digits)
         indices = random.sample(range(len(digit_images)), num_digits)
         
-        # 2. Create black canvas
-        canvas = torch.zeros(canvas_height, canvas_width)
+        # Create a white canvas (background)
+        canvas = torch.ones(canvas_height, canvas_width)
         
-        # 3. Paste digits with controlled, CAPTCHA-like overlap
+        # --- Simplified Digit Placement ---
         positions = []
         
-        # Estimate the total width of the sequence to allow for more random placement
-        avg_advance = 14 
-        estimated_sequence_width = digit_size + (num_digits - 1) * avg_advance
-        max_start_x = max(0, canvas_width - estimated_sequence_width)
-        current_x = random.randint(0, max_start_x)  # Start with larger random horizontal padding
+        # Leave a small random padding at the start
+        current_x = random.randint(2, 10)
 
         for idx in indices:
             # Stop if the next digit would go off the canvas
-            if current_x + 28 > canvas_width:
+            if current_x + digit_size > canvas_width:
                 break
                 
-            # Get the original digit and convert to numpy array
-            digit_np = digit_images[idx, 0].numpy()
-            
-            if random.random() < 0.2:
-                # 20% of the time, apply random rotation and scaling
-                scale = random.uniform(0.5, 1.2)
-                angle = random.uniform(-45, 45)
-            else:
-                # 80% of the time, use default scale and no rotation
-                scale = 1.0
-                angle = 0
-            
-            # Get the center of the image for rotation
-            center = (digit_size // 2, digit_size // 2)
-            
-            # Create rotation matrix and apply transformation
-            rotation_matrix = cv2.getRotationMatrix2D(center, angle, scale)
-            
-            # Apply rotation and scaling
-            transformed_digit = cv2.warpAffine(digit_np, rotation_matrix, (digit_size, digit_size))
-            
-            # Convert back to torch tensor
-            digit_tensor = torch.from_numpy(transformed_digit)
+            digit_tensor = digit_images[idx, 0] # It's already a tensor (black bg)
 
-            # Random vertical position, adjusted for the transformed size
+            # Invert digit to be black on white background before placing
+            digit_tensor = 1 - digit_tensor
+            
+            # Random vertical position
             y_offset = random.randint(0, canvas_height - digit_size)
             x_pos = current_x
 
-            # Calculate ROI size based on digit boundaries
-            roi_height = min(digit_size, canvas_height - y_offset)
-            roi_width = min(digit_size, canvas_width - x_pos)
-
-            # Paste using maximum to blend white digits, creating the overlap effect
-            canvas_roi = canvas[y_offset:y_offset + roi_height, x_pos:x_pos + roi_width]
-            digit_roi = digit_tensor[:roi_height, :roi_width]
-            canvas[y_offset:y_offset + roi_height, x_pos:x_pos + roi_width] = torch.maximum(canvas_roi, digit_roi)
+            # Paste the digit onto the canvas
+            # Use minimum to blend black digits onto the white canvas
+            canvas_roi = canvas[y_offset:y_offset + digit_size, x_pos:x_pos + digit_size]
+            canvas[y_offset:y_offset + digit_size, x_pos:x_pos + digit_size] = torch.minimum(canvas_roi, digit_tensor)
 
             positions.append((x_pos, digit_labels[idx].item()))
 
-            # Advance x for the next digit, ensuring partial overlap
-            advance = random.randint(12, 16)  # Causes more overlap to fit in smaller canvas
-            current_x += advance
+            # Advance x for the next digit with a small random gap
+            current_x += digit_size + random.randint(-5, 5)
 
-        # Get labels sorted left-to-right and truncate to max_digits
-        sorted_labels = [label for _, label in sorted(positions)][:max_digits]
+        # Get labels sorted left-to-right
+        sorted_labels = [label for _, label in sorted(positions)]
         
-        # 4. Invert canvas to get black digits on white background
-        final_canvas = 1 - canvas
+        # --- Patching and Sequence Creation (same as before) ---
         
-        # 5. Add Gaussian noise if specified (training only, and only for 20% of samples)
-        if add_noise and random.random() < 0.2:
-            noise = torch.randn_like(final_canvas) * 0.1  # Small noise std
-            final_canvas = torch.clamp(final_canvas + noise, 0, 1)
-
-        # Apply the same preprocessing as inference to bridge the domain gap
-        # between synthetic training data and real-world images.
-        canvas_np = final_canvas.numpy()
-        
-        # High-contrast normalization (mimics inference preprocessing)
-        processed_canvas = np.clip(((canvas_np - 0.45) * 8) + 0.45, 0, 1)
-
-        # Erosion to thicken digits (mimics inference preprocessing)
-        kernel = np.ones((2, 2), np.uint8)
-        eroded_canvas = cv2.erode(processed_canvas, kernel)
-        
-        # Convert back to tensor for patchifying
-        processed_tensor = torch.from_numpy(eroded_canvas.astype(np.float32))
-
-        # 6. Patch the final canvas
-        patches = processed_tensor.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
+        # Patch the final canvas
+        patches = canvas.unfold(0, patch_size, patch_size).unfold(1, patch_size, patch_size)
         patches = patches.contiguous().view(-1, patch_size, patch_size)
-        patches = patches.unsqueeze(1) # Add channel dim: [100, 1, 6, 6]
+        patches = patches.unsqueeze(1) # Add channel dim
 
-        # 7. Create decoder input and target output sequences
+        # Create decoder input and target output sequences
         decoder_input = [SOS_TOKEN] + sorted_labels
         decoder_input.extend([PAD_TOKEN] * (max_seq_len - len(decoder_input)))
 
@@ -189,8 +131,8 @@ def create_canvas_sequences(digit_images, digit_labels, num_sequences=1000, max_
     )
 
 
-def visualize_canvas_sequence(canvas_patches, canvas_labels, sequence_idx=0):
-    """Reconstructs the canvas from patches and displays it."""
+def visualize_sequence(canvas_patches, canvas_labels, sequence_idx=0):
+    """Reconstructs the image from patches and displays it."""
     patches = canvas_patches[sequence_idx]
     
     # Check if labels are in the new tuple format (decoder_input, target_output)
@@ -218,16 +160,16 @@ def visualize_canvas_sequence(canvas_patches, canvas_labels, sequence_idx=0):
     # Show the canvas with a smoother interpolation
     plt.figure(figsize=(15, 3))
     plt.imshow(full_canvas.numpy(), cmap='gray', interpolation='lanczos')
-    plt.title(f'Canvas Sequence {sequence_idx}: Labels = {valid_labels}')
+    plt.title(f'Sequence {sequence_idx}: Labels = {valid_labels}')
     plt.axis('off')
     plt.tight_layout()
     plt.show()
     
     return valid_labels
 
-def save_canvas_sequence(canvas_patches, canvas_labels, num_to_save=20, save_dir="saved_canvases"):
+def save_sequence(canvas_patches, canvas_labels, num_to_save=20, save_dir="saved_images"):
     """
-    Saves a specified number of random canvas sequences from a batch to files.
+    Saves a specified number of random image sequences from a batch to files.
     """
     os.makedirs(save_dir, exist_ok=True)
     
@@ -263,33 +205,33 @@ def save_canvas_sequence(canvas_patches, canvas_labels, num_to_save=20, save_dir
             full_canvas[row*patch_size:(row+1)*patch_size, col*patch_size:(col+1)*patch_size] = patch.squeeze()
 
         # Save the figure
-        filename = f"canvas_seq_{seq_idx}_labels_{'_'.join(valid_labels)}.png"
+        filename = f"sequence_{seq_idx}_labels_{'_'.join(valid_labels)}.png"
         filepath = os.path.join(save_dir, filename)
         
         plt.figure(figsize=(15, 3))
         plt.imshow(full_canvas.numpy(), cmap='gray', interpolation='lanczos')
-        plt.title(f'Canvas Sequence {seq_idx}: Labels = {valid_labels}')
+        plt.title(f'Sequence {seq_idx}: Labels = {valid_labels}')
         plt.axis('off')
         plt.tight_layout()
         plt.savefig(filepath)
         plt.close()  # Close the figure to free up memory
 
-    print(f"✅ Saved {num_to_save} random canvases to '{save_dir}/'")
+    print(f"✅ Saved {num_to_save} random images to '{save_dir}/'")
 
 def get_data(split='train', num_sequences=1000, max_digits=5, num_source_images=None):
     """
-    Generates canvas sequences for a specified data split.
+    Generates image sequences for a specified data split.
 
     Args:
         split (str): The data split to use ('train', 'val', or 'test').
-        num_sequences (int): The number of canvas sequences to generate.
-        max_digits (int): The maximum number of digits to place on a canvas.
+        num_sequences (int): The number of image sequences to generate.
+        max_digits (int): The maximum number of digits to place on an image.
         num_source_images (int, optional): The number of original digit images
-            to use as a source for creating canvases. If None, all images in the
+            to use as a source for creating sequences. If None, all images in the
             specified split are used.
 
     Returns:
-        A tuple of (canvas_patches, canvas_labels).
+        A tuple of (image_patches, image_labels).
     """
     # Get the pre-split source images and labels
     images, img_labels = DATA_SPLITS[split]
@@ -299,6 +241,6 @@ def get_data(split='train', num_sequences=1000, max_digits=5, num_source_images=
         images = images[:num_source_images]
         img_labels = img_labels[:num_source_images]
         
-    # Add noise only to training data
-    add_noise = (split == 'train')
-    return create_canvas_sequences(images, img_labels, num_sequences, max_digits, add_noise)
+    return create_sequences(images, img_labels, num_sequences, max_digits)
+
+
